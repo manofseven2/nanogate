@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Spring Boot 4.0.4 Parent: Manages versions for common dependencies -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.4</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.nanogate</groupId>
+    <artifactId>nanogate-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>NanoGate Parent</name>
+    <description>Parent POM for the NanoGate API Gateway Project</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Assuming Spring Cloud 2024.x for Spring Boot 4.x -->
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
+    </properties>
+
+    <modules>
+        <module>nanogate-app</module>
+        <module>nanogate-routing</module>
+        <module>nanogate-resilience</module>
+        <module>nanogate-scripting</module>
+        <module>nanogate-security</module>
+        <module>nanogate-protocol-support</module>
+        <module>nanogate-caching</module>
+        <module>nanogate-observability</module>
+    </modules>
+
+    <!-- Dependency Management for all child modules -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Cloud Bill of Materials (BOM) -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

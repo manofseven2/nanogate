@@ -26,7 +26,7 @@
 *   **Use Case:** An external client sends a request to `https://nanogate.example.com/api/users/123`. The gateway matches the `/api/users/**` path and forwards the request to the internal User Service at `http://internal-user-service/123`.
 *   **Inputs:**
     *   Incoming HTTP Request (Method, URL, Headers, Body).
-    *   Static routing configuration (defined in `application.yml` for this phase).
+    *   Static routing configuration (defined in `routes.yml` for this phase which is addressed by a property in `application.yml` file).
 *   **Outputs:**
     *   Proxied HTTP Response from the backend service.
     *   If no route matches, a `404 Not Found` response.

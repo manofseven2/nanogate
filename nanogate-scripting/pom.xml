@@ -21,11 +21,7 @@
             core transformation capabilities will be provided by Spring Cloud Gateway
             and enabled for native compilation in the app module.
         -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-gateway</artifactId>
-            <scope>provided</scope> <!-- Provided by the app module -->
-        </dependency>
+
     </dependencies>
 
 </project>

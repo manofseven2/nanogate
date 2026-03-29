@@ -1,0 +1,29 @@
+# Enable Virtual Threads for all incoming web requests
+spring:
+  threads:
+    virtual:
+      enabled: true
+
+# NanoGate Routing Configuration
+nanogate:
+  routing:
+    enabled: true
+    routes:
+      # Route for a hypothetical "User Service"
+      - id: user-service-route
+        # Match any request starting with /api/users/
+        path: /api/users/**
+        # List of available backend servers
+        target-uris:
+          - http://localhost:8081
+          - http://localhost:8082
+        # Load balancing strategy for this route
+        load-balancer: ROUND_ROBIN
+
+      # Route for a hypothetical "Order Service"
+      - id: order-service-route
+        # Match any request starting with /api/orders/
+        path: /api/orders/**
+        target-uris:
+          - http://localhost:9090
+        load-balancer: ROUND_ROBIN

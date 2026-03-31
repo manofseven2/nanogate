@@ -19,7 +19,7 @@ This document outlines the phased approach for developing the **NanoGate** API G
 ## Phase 2: Resiliency & Advanced Routing
 **Goal:** Ensure the gateway can handle backend failures gracefully and support complex, modern application protocols.
 
-*   **Asynchronous & WebSocket Support:** Upgrade the routing engine to handle non-blocking asynchronous requests and seamlessly proxy WebSocket (ws/wss) connections.
+*   **Asynchronous, WebSocket & SSE Support:** Upgrade the routing engine to handle non-blocking asynchronous requests, seamlessly proxy WebSocket (ws/wss) connections, and support Server-Sent Events (SSE) for streaming capabilities.
 *   **Resiliency Engine:**
     *   Implement **Circuit Breakers** to prevent cascading failures.
     *   Configure **Timeouts** for backend calls.

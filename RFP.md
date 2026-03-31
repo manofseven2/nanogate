@@ -23,7 +23,7 @@ The selected vendor/team will be responsible for developing the core prototype o
 * **Advanced Routing & Service Management:**
     *   **Backend Sets:** Implement a configuration model that separates backend server pools ("Backend Sets") from routing rules. This allows for centralized management of server lists and their default policies.
     *   **Intelligent Dynamic Routing:** Route requests based on URL paths, headers, and HTTP methods to a named Backend Set. The routing engine must **always prioritize more specific path patterns** (e.g., `/api/users/specific`) over more general ones (e.g., `/api/users/**`), regardless of their order in the configuration.
-    *   **Protocol Support:** Support both **synchronous** and **asynchronous** requests, as well as seamlessly proxying **WebSocket (ws/wss)** connections.
+    *   **Protocol Support:** Support both **synchronous** and **asynchronous** requests, as well as seamlessly proxying **WebSocket (ws/wss)** connections and **Server-Sent Events (SSE)** for streaming capabilities.
 * **Hierarchical & Configurable HTTP Client:**
     *   Implement a three-tiered configuration hierarchy (Global -> Backend Set -> Route) for backend HTTP client properties (e.g., timeouts, connection pools).
     *   A more specific level's configuration will override the more general level, allowing for fine-grained control over individual routes.

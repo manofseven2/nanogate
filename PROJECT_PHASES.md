@@ -26,6 +26,8 @@ This document outlines the phased approach for developing the **NanoGate** API G
     *   Enable **Automatic Retries** for safe, idempotent requests.
 *   **Active Health Checking:** Implement a background worker to continuously ping downstream `/health` endpoints and automatically remove unhealthy instances from the load balancer pool.
 *   **API Versioning:** Add native support for routing based on URL paths (`/v1/`) and HTTP headers (`Accept-Version`).
+*   **URL Rewriting:** Implement core functionality to strip or rewrite URL path prefixes before proxying requests to downstream backends.
+*   **Header Transformation:** Introduce capabilities to natively add, remove, and override HTTP headers on incoming requests and outgoing responses before routing.
 
 ---
 

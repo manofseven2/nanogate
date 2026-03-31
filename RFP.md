@@ -32,6 +32,7 @@ The selected vendor/team will be responsible for developing the core prototype o
     *   Define a default load balancer at the Backend Set level.
     *   Allow individual routes to **optionally override** the load balancer for fine-grained control.
 * **API Versioning:** Native support for routing traffic based on API versions via URL paths (`/api/v1/...`) or HTTP Headers (`Accept-Version: v2`).
+* **Header Transformation & Manipulation:** Natively support adding, removing, overriding, or dynamically editing HTTP request and response headers before forwarding requests to the backend or returning responses to the client.
 * **Scripting / Advanced Transformation:** A handy scripting functionality to dynamically transform requests and responses.
 * **Cross-Cutting Features:** Native support for managing CORS, response caching, and basic rate limiting.
 * **Health Checking & Resiliency:**

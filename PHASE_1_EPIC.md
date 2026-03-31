@@ -6,7 +6,7 @@
 
 ---
 
-## Task 1: Refactor Configuration Models
+## Task 1: Project Structure & Initial Configuration Models
 
 *   **Goal:** Implement a new configuration structure that separates backend server definitions from routing rules.
 *   **Definition:**
@@ -42,7 +42,19 @@
 *   **Inputs:** An incoming `HttpServletRequest`.
 *   **Outputs:** The single, most specific `Route` that matches the request.
 
-## Task 4: Containerization & Local Deployment
+## Task 4: Write Unit and Mock Tests
+
+*   **Goal:** Ensure code quality and prevent regressions by writing comprehensive unit and mock tests for all core classes developed in the project.
+*   **Definition:**
+    1.  Create tests for all classes in the `config` package (e.g., `NanoGateRouteProperties`, `RoutingProperties`, `RouteConfiguration`), verifying configuration loading, mapping, and validation logic.
+    2.  Create mock tests for all classes in the `filter` package (e.g., `RoutingFilter`), verifying the core orchestration logic, including finding routes, resolving backend sets, calculating HTTP client properties, load balancing, and proxying. Mock necessary dependencies.
+    3.  Create unit tests for all classes in the `model` package (e.g., `Route`, `BackendSet`, `LoadBalancerType`, `HttpClientProperties`) to verify their logic, data integrity, and potential utility methods.
+    4.  Create tests for all classes in the `service` package (e.g., `LoadBalancer`, `RequestProxy`, `RouteLocator`, `HttpClientProvider`, `LoadBalancerFactory`, `InMemoryRouteLocator`, `RoundRobinLoadBalancer`). Mock external dependencies where necessary and verify specific logic like round-robin algorithms, route sorting, and client generation.
+*   **Use Case:** A developer refactors a piece of code and runs the test suite to confidently verify that no existing functionality across any package was broken.
+*   **Inputs:** The implementation classes in the `config`, `filter`, `model`, and `service` packages.
+*   **Outputs:** A suite of passing unit tests using standard testing frameworks (e.g., JUnit 5, Mockito) that cover all classes in the specified packages.
+
+## Task 5: Containerization & Local Deployment
 
 *   **Goal:** Package NanoGate into a standardized Docker image for consistent deployment across environments.
 *   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
@@ -50,7 +62,7 @@
 *   **Inputs:** Compiled application artifact (`.jar` file).
 *   **Outputs:** A functional `Dockerfile` and `docker-compose.yml`.
 
-## Task 5: Future - Least Connections Load Balancer
+## Task 6: Future - Least Connections Load Balancer
 
 *   **Goal:** Implement a more dynamic load balancing algorithm that adapts to server load.
 *   **Definition:** Create a new `LeastConnectionsLoadBalancer` that implements the `LoadBalancer` interface. This implementation will need to track the number of active connections to each backend URI within a `BackendSet`. The design should consider both a simple in-memory implementation for local state and a future-proof hook for using a distributed cache (like Redis) for global state.

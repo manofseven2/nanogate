@@ -6,10 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.AntPathMatcher;
 
+import java.util.Comparator;
 import java.util.Optional;
 
 /**
  * An in-memory implementation of RouteLocator that finds routes based on configuration properties.
+ * It correctly prioritizes more specific routes.
  */
 @Service
 public class InMemoryRouteLocator implements RouteLocator {
@@ -28,8 +30,15 @@ public class InMemoryRouteLocator implements RouteLocator {
         }
 
         String requestPath = request.getRequestURI();
+
+        // Get the comparator from AntPathMatcher which understands path specificity
+        Comparator<Route> routeComparator = (r1, r2) ->
+                pathMatcher.getPatternComparator(requestPath).compare(r1.getPath(), r2.getPath());
+
+        // Sort the routes to ensure the most specific path is matched first,
+        // then find the first one that matches the request.
         return properties.getRoutes().stream()
                 .filter(route -> pathMatcher.match(route.getPath(), requestPath))
-                .findFirst();
+                .min(routeComparator); // .min() with the comparator gives us the "best" or most specific match
     }
 }

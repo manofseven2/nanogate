@@ -5,13 +5,14 @@ This document outlines the phased approach for developing the **NanoGate** API G
 ---
 
 ## Phase 1: Foundation & Core Routing (MVP)
-**Goal:** Establish the baseline architecture and prove the core concept of dynamic, lightweight routing.
+**Goal:** Establish a professional baseline architecture featuring a decoupled "Backend Set" configuration model, a hierarchical HTTP client configuration, and implement the core synchronous routing engine with a pluggable, round-robin load balancer.
 
-*   **Project Setup:** Initialize the Spring Boot (or native stack) project with necessary core dependencies.
-*   **Synchronous Routing Engine:** Implement basic path-based and header-based request forwarding to downstream services.
-*   **Basic Load Balancing:** Implement in-memory round-robin and least-connections load balancing for backend services.
-*   **DNS-Based Service Discovery:** Enable routing using standard Kubernetes/internal DNS names (`http://service-name`).
-*   **Containerization:** Create initial Dockerfiles for local testing and basic deployment.
+*   **Project Setup:** Initialize the multi-module Spring Boot project with a virtual-thread-based web server.
+*   **Backend Set Architecture:** Implement a configuration model that separates backend server pools (`Backend Sets`) from routing rules (`Routes`).
+*   **Hierarchical HTTP Client Configuration:** Implement a three-tiered (Global -> Backend Set -> Route) configuration model for backend HTTP client properties (e.g., timeouts).
+*   **Synchronous Routing Engine:** Implement a core routing filter that maps incoming requests to a `Route` and then to its designated `Backend Set`.
+*   **Pluggable Load Balancing:** Implement a `LoadBalancerFactory` and the initial **Round-Robin** algorithm. Routes will be able to override the default load balancer defined in the `Backend Set`.
+*   **Containerization:** Create initial Dockerfiles for local testing.
 
 ---
 
@@ -76,3 +77,18 @@ This document outlines the phased approach for developing the **NanoGate** API G
     *   Prepare official Terms of Use and Privacy Policy documents.
 *   **Submission & Certification:** Submit the complete offer through the Microsoft Partner Center portal. This will trigger a multi-stage validation and certification process by Microsoft, which may require several rounds of feedback and fixes.
 *   **Post-Launch Support Plan:** Define and document a clear process for handling customer support inquiries, bug fixes, and version updates for the marketplace offer.
+
+---
+
+## Phase 7: Advanced Configuration & Customization
+**Goal:** Enhance NanoGate's flexibility by exposing advanced configuration options for core components, allowing for fine-tuned performance and behavior.
+
+*   **Extended HTTP Client Configuration:**
+    *   Add support for configuring HTTP protocol versions (HTTP/1.1, HTTP/2) on a hierarchical basis (Global -> Backend Set -> Route).
+    *   Implement configurable redirect policies (NEVER, ALWAYS, NORMAL) for outgoing backend requests, also following the hierarchical override model.
+    *   Introduce options for configuring outgoing proxy settings for backend communication.
+*   **Advanced Load Balancing Strategies:**
+    *   Implement the **Least Connections** load balancing algorithm, considering both instance-local and distributed state management.
+    *   Explore and implement other advanced algorithms like Weighted Round Robin or IP Hash.
+*   **Customizable Health Checks:** Allow configuration of health check paths, intervals, and failure thresholds per Backend Set.
+*   **Fine-Grained Resiliency Tuning:** Expose more detailed configuration for Circuit Breaker thresholds, retry policies, and timeout durations.

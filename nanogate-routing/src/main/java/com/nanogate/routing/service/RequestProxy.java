@@ -1,5 +1,6 @@
 package com.nanogate.routing.service;
 
+import com.nanogate.routing.model.HttpClientProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
@@ -9,36 +10,36 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Enumeration;
 
 /**
  * Service responsible for proxying the incoming HttpServletRequest to a target URI.
- * Uses Java's HttpClient for efficient, synchronous (with virtual threads) request forwarding.
+ * It uses a provided HttpClient instance to perform the request forwarding.
  */
 @Service
 public class RequestProxy {
 
-    private final HttpClient httpClient;
+    private final HttpClientProvider httpClientProvider;
 
-    public RequestProxy() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1) // Use HTTP/1.1 for now, can be upgraded later
-                .connectTimeout(Duration.ofSeconds(10)) // Connection timeout
-                .build();
+    public RequestProxy(HttpClientProvider httpClientProvider) {
+        this.httpClientProvider = httpClientProvider;
     }
 
     /**
-     * Proxies the incoming request to the specified target URI.
+     * Proxies the incoming request to the specified target URI using a client with the given properties.
      *
      * @param request The original HttpServletRequest.
      * @param response The original HttpServletResponse.
      * @param targetUri The URI of the backend service to forward the request to.
+     * @param clientProperties The resolved HTTP client properties for this request.
      * @throws IOException If an I/O error occurs during proxying.
      * @throws InterruptedException If the operation is interrupted.
      */
-    public void proxyRequest(HttpServletRequest request, HttpServletResponse response, URI targetUri)
+    public void proxyRequest(HttpServletRequest request, HttpServletResponse response, URI targetUri, HttpClientProperties clientProperties)
             throws IOException, InterruptedException {
+
+        // Get a cached HttpClient instance for this request's configuration
+        HttpClient httpClient = httpClientProvider.getClient(clientProperties);
 
         // 1. Build the HttpRequest for the backend
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
@@ -57,11 +58,15 @@ public class RequestProxy {
         URI finalTargetUri = URI.create(targetUri.getScheme() + "://" + targetUri.getAuthority() + newPath + (request.getQueryString() != null ? "?" + request.getQueryString() : ""));
         requestBuilder.uri(finalTargetUri);
 
-        // Copy headers (excluding hop-by-hop headers like Connection, Keep-Alive, Proxy-Authenticate, Proxy-Authorization, TE, Trailers, Transfer-Encoding, Upgrade)
+        // Apply response timeout if specified
+        if (clientProperties.getResponseTimeout() != null) {
+            requestBuilder.timeout(clientProperties.getResponseTimeout());
+        }
+
+        // Copy headers (excluding hop-by-hop headers)
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
-            // Exclude headers that are managed by the client/server or are hop-by-hop
             if (!isHopByHopHeader(headerName)) {
                 Enumeration<String> headerValues = request.getHeaders(headerName);
                 while (headerValues.hasMoreElements()) {
@@ -77,7 +82,6 @@ public class RequestProxy {
         response.setStatus(backendResponse.statusCode());
 
         backendResponse.headers().map().forEach((name, values) -> {
-            // Exclude hop-by-hop headers from the response as well
             if (!isHopByHopHeader(name)) {
                 values.forEach(value -> response.addHeader(name, value));
             }
@@ -87,14 +91,12 @@ public class RequestProxy {
     }
 
     private boolean isHopByHopHeader(String headerName) {
-        // List of HTTP/1.1 hop-by-hop headers
-        // https://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html#sec13.5.1
         String lowerCaseHeaderName = headerName.toLowerCase();
         return lowerCaseHeaderName.equals("connection") ||
                lowerCaseHeaderName.equals("keep-alive") ||
                lowerCaseHeaderName.equals("proxy-authenticate") ||
                lowerCaseHeaderName.equals("proxy-authorization") ||
-               lowerCaseHeaderName.equals("te") || // Transfer-Encoding
+               lowerCaseHeaderName.equals("te") ||
                lowerCaseHeaderName.equals("trailers") ||
                lowerCaseHeaderName.equals("transfer-encoding") ||
                lowerCaseHeaderName.equals("upgrade");

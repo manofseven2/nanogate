@@ -1,65 +1,59 @@
 # Epic: NanoGate Phase 1 - Foundation & Core Routing (MVP)
 
-**Epic Goal:** Establish the foundational architecture for the NanoGate API Gateway and implement the core, lightweight synchronous routing engine capable of discovering and load-balancing traffic to downstream microservices.
+**Epic Goal:** Establish a professional baseline architecture featuring a decoupled "Backend Set" configuration model, a hierarchical HTTP client configuration, and implement the core synchronous routing engine with a pluggable, round-robin load balancer.
 
-**Description:** This epic covers the initial setup of the Spring Boot application and the development of the minimal viable product (MVP). At the end of this epic, NanoGate will be able to receive incoming HTTP requests, determine the correct backend service based on configuration, forward the request using a basic load-balancing strategy, and return the response to the client. The application will also be containerized for easy testing.
+**Description:** This epic focuses on building a robust and maintainable foundation for NanoGate. The core architectural change is to separate the concept of backend server pools (`Backend Sets`) from the routing rules (`Routes`). This allows for cleaner configuration and centralized management of backend policies.
 
 ---
 
-## Task 1: Project Initialization & Core Setup
+## Task 1: Refactor Configuration Models
 
-*   **Goal:** Create the skeletal structure of the NanoGate application with the necessary foundational dependencies.
-*   **Definition:** Initialize a Spring Boot 3.x/4.x project (or equivalent chosen stack) configured for web routing. This includes setting up the basic project structure, build tool (Maven/Gradle), and adding essential libraries (e.g., Spring Cloud Gateway core or equivalent lightweight proxy libraries if building from scratch).
-*   **Use Case:** A developer needs to clone the repository and build the project locally without errors to start contributing.
-*   **Inputs:**
-    *   Project requirements (Java version, Spring Boot version).
-    *   List of core dependencies (Webflux/WebMVC, Proxy libs).
-*   **Outputs:**
-    *   A compilable project repository (e.g., `pom.xml` or `build.gradle`).
-    *   A runnable main application class.
-    *   Basic application configuration file (`application.yml` or `application.properties`).
+*   **Goal:** Implement a new configuration structure that separates backend server definitions from routing rules.
+*   **Definition:**
+    1.  Create a `BackendSet.java` model class containing `name`, `loadBalancer` (default), and `servers` (list of URIs).
+    2.  Refactor the `Route.java` model to remove `targetUris` and `loadBalancer`, replacing them with a `String backendSet` reference and an optional `String loadBalancer` for overrides.
+    3.  Update `NanoGateRouteProperties.java` to include a `List<BackendSet> backendSets`.
+*   **Use Case:** A developer can now define a pool of servers once in a `backend-set` and refer to it by name in multiple `routes`, reducing configuration duplication.
+*   **Inputs:** The new YAML structure with `backend-sets` and `routes`.
+*   **Outputs:** Java model classes that accurately reflect the new configuration hierarchy.
 
-## Task 2: Core Synchronous Routing Engine
+## Task 2: Implement Hierarchical HTTP Client Configuration
 
-*   **Goal:** Enable NanoGate to forward incoming HTTP requests to a specified destination based on static rules.
-*   **Definition:** Implement the core routing logic. The gateway must inspect incoming request URLs (paths) and HTTP headers to match them against a set of configured routing rules. Upon a match, it must construct a new HTTP request to the target URL, forward it synchronously, and proxy the response back to the client.
-*   **Use Case:** An external client sends a request to `https://nanogate.example.com/api/users/123`. The gateway matches the `/api/users/**` path and forwards the request to the internal User Service at `http://internal-user-service/123`.
-*   **Inputs:**
-    *   Incoming HTTP Request (Method, URL, Headers, Body).
-    *   Static routing configuration (defined in `routes.yml` for this phase which is addressed by a property in `application.yml` file).
-*   **Outputs:**
-    *   Proxied HTTP Response from the backend service.
-    *   If no route matches, a `404 Not Found` response.
+*   **Goal:** Implement a three-tiered, configurable, and cached provider for backend `HttpClient` instances.
+*   **Definition:**
+    1.  Create an `HttpClientProperties.java` model to hold client settings (e.g., `connectTimeout`).
+    2.  Add an optional `HttpClientProperties` field to the `Route`, `BackendSet`, and global `NanoGateRouteProperties` models.
+    3.  Create a new `HttpClientProvider.java` service. This service will be responsible for creating and caching `HttpClient` instances based on a final, merged set of properties.
+    4.  Refactor `RoutingFilter.java` to calculate the final merged `HttpClientProperties` for each request by applying the Route -> Backend Set -> Global override logic.
+    5.  Refactor `RequestProxy.java` to use the `HttpClientProvider` to get a client for each request instead of creating its own.
+*   **Use Case:** A global connect timeout is set to 5s. A specific route for a slow service overrides this to 30s. The `RoutingFilter` calculates the final 30s timeout and the `RequestProxy` uses a client with that specific setting.
+*   **Inputs:** A request's `Route` and `BackendSet`.
+*   **Outputs:** A correctly configured and potentially cached `HttpClient` instance for proxying.
 
-## Task 3: Basic Load Balancing Implementation
+## Task 3: Implement Intelligent Core Routing
 
-*   **Goal:** Distribute incoming traffic across multiple instances of a downstream service.
-*   **Definition:** Enhance the routing engine to support multiple target URLs for a single route. Implement in-memory load balancing algorithms: specifically, **Round-Robin** (distributing requests sequentially) and **Least-Connections** (sending the request to the backend with the fewest active requests).
-*   **Use Case:** The User Service has three healthy instances. NanoGate receives three sequential requests for the User Service and routes the first request to Instance A, the second to Instance B, and the third to Instance C.
-*   **Inputs:**
-    *   A matched routing rule containing a list of available backend target URLs.
-    *   The chosen load balancing strategy configuration.
-*   **Outputs:**
-    *   A single selected target URL for the current request.
+*   **Goal:** Implement the core routing logic, ensuring that more specific routes are always prioritized.
+*   **Definition:**
+    1.  Refactor `InMemoryRouteLocator.java` to sort routes by path specificity (e.g., using `AntPathMatcher.getPatternComparator()`) before attempting to find a match. This ensures that a request to `/api/users/reports` will match `/api/users/reports/**` before it matches `/api/users/**`.
+    2.  Modify the `LoadBalancer.java` interface to accept a `BackendSet` object.
+    3.  Update `RoundRobinLoadBalancer.java` to work with the new interface signature.
+    4.  Refactor `RoutingFilter.java` to implement the core orchestration: find the most specific route, look up its `BackendSet`, determine the correct load balancer to use (respecting overrides), and proxy the request.
+*   **Use Case:** A request to `/api/users/reports/1` correctly matches the `/api/users/reports/**` route, even if the more general `/api/users/**` route is defined first in the configuration file.
+*   **Inputs:** An incoming `HttpServletRequest`.
+*   **Outputs:** The single, most specific `Route` that matches the request.
 
-## Task 4: DNS-Based Service Discovery Integration
-
-*   **Goal:** Allow NanoGate to resolve backend services using internal DNS names rather than hardcoded IP addresses.
-*   **Definition:** Configure the gateway to resolve target URLs utilizing the underlying environment's DNS resolution (e.g., Kubernetes CoreDNS). The gateway should be able to take a target like `http://user-service` and successfully route to it, relying on the OS/JVM DNS resolver to find the actual IP address.
-*   **Use Case:** NanoGate is deployed in Kubernetes. A route is configured to forward to `http://order-service`. The gateway seamlessly resolves this internal Kubernetes service name to the correct cluster IP without needing a separate service registry like Eureka.
-*   **Inputs:**
-    *   Target URL containing a DNS hostname instead of an IP address.
-*   **Outputs:**
-    *   Successfully established connection to the resolved backend service.
-
-## Task 5: Containerization & Local Deployment
+## Task 4: Containerization & Local Deployment
 
 *   **Goal:** Package NanoGate into a standardized Docker image for consistent deployment across environments.
-*   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Optimizations should be considered (e.g., multi-stage builds, minimal base images like Alpine or Distroless) to align with the "lightweight" goal. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
-*   **Use Case:** A QA engineer wants to test the routing rules. They run `docker-compose up`, which starts NanoGate and a mock backend, allowing them to send requests immediately without setting up a Java environment.
-*   **Inputs:**
-    *   Compiled application artifact (e.g., `.jar` file or native executable).
-*   **Outputs:**
-    *   A functional `Dockerfile`.
-    *   A `docker-compose.yml` demonstrating a basic working setup.
-    *   A built container image available locally.
+*   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
+*   **Use Case:** A QA engineer can run `docker-compose up` to test the new Backend Set routing logic without needing a local Java environment.
+*   **Inputs:** Compiled application artifact (`.jar` file).
+*   **Outputs:** A functional `Dockerfile` and `docker-compose.yml`.
+
+## Task 5: Future - Least Connections Load Balancer
+
+*   **Goal:** Implement a more dynamic load balancing algorithm that adapts to server load.
+*   **Definition:** Create a new `LeastConnectionsLoadBalancer` that implements the `LoadBalancer` interface. This implementation will need to track the number of active connections to each backend URI within a `BackendSet`. The design should consider both a simple in-memory implementation for local state and a future-proof hook for using a distributed cache (like Redis) for global state.
+*   **Use Case:** A backend service has two instances. Instance A is busy processing a slow request. The gateway receives a new request and, seeing that Instance B has zero active connections, forwards the request to Instance B.
+*   **Inputs:** A mechanism to track active connection counts per URI (e.g., an in-memory map of AtomicIntegers).
+*   **Outputs:** The backend URI with the lowest number of active connections.

@@ -20,13 +20,24 @@ We are seeking to develop **NanoGate**, a lightweight, free (open-source model),
 The selected vendor/team will be responsible for developing the core prototype of the API Gateway, focusing on the following functional areas:
 
 ### 3.1. Core Functionality (To be implemented natively)
-* **Dynamic Routing & Decoupling:** Request forwarding based on URL paths, headers, and HTTP methods, supporting both **synchronous** and **asynchronous** requests, as well as seamlessly proxying **WebSocket (ws/wss)** connections.
+* **Advanced Routing & Service Management:**
+    *   **Backend Sets:** Implement a configuration model that separates backend server pools ("Backend Sets") from routing rules. This allows for centralized management of server lists and their default policies.
+    *   **Intelligent Dynamic Routing:** Route requests based on URL paths, headers, and HTTP methods to a named Backend Set. The routing engine must **always prioritize more specific path patterns** (e.g., `/api/users/specific`) over more general ones (e.g., `/api/users/**`), regardless of their order in the configuration.
+    *   **Protocol Support:** Support both **synchronous** and **asynchronous** requests, as well as seamlessly proxying **WebSocket (ws/wss)** connections.
+* **Hierarchical & Configurable HTTP Client:**
+    *   Implement a three-tiered configuration hierarchy (Global -> Backend Set -> Route) for backend HTTP client properties (e.g., timeouts, connection pools).
+    *   A more specific level's configuration will override the more general level, allowing for fine-grained control over individual routes.
+* **Pluggable Load Balancing:**
+    *   Implement a pluggable load balancing framework (e.g., Round-Robin, Least Connections).
+    *   Define a default load balancer at the Backend Set level.
+    *   Allow individual routes to **optionally override** the load balancer for fine-grained control.
 * **API Versioning:** Native support for routing traffic based on API versions via URL paths (`/api/v1/...`) or HTTP Headers (`Accept-Version: v2`).
-* **Scripting / Advanced Transformation:** A handy scripting functionality (e.g., using Groovy, JavaScript/GraalVM, or a lightweight DSL) to dynamically transform requests and responses (payloads, URLs, headers) before they reach the backend or return to the client.
-* **Cross-Cutting Features:** Native support for managing CORS, response caching mechanisms, and basic rate limiting (in-memory or distributed) to protect downstream services.
-* **Load Balancing & Health Checking:** Basic round-robin or least-connections load balancing across downstream services, coupled with **active health checking** (e.g., pinging a `/health` endpoint to temporarily remove failing backends from the pool).
-* **Resiliency Mechanisms:** Implementation of essential fault-tolerance patterns, including **Circuit Breakers** (to instantly fail requests if a backend is down), **Timeouts**, and **Automatic Retries** for idempotent requests.
-* **Lightweight Threat Protection:** Basic security measures including payload size limits to prevent out-of-memory crashes and basic IP Allowlisting/Blocklisting.
+* **Scripting / Advanced Transformation:** A handy scripting functionality to dynamically transform requests and responses.
+* **Cross-Cutting Features:** Native support for managing CORS, response caching, and basic rate limiting.
+* **Health Checking & Resiliency:**
+    *   **Active Health Checking:** Actively ping backend servers to remove unhealthy instances from the load balancing pool.
+    *   **Resiliency Mechanisms:** Implement essential fault-tolerance patterns, including **Circuit Breakers**, **Timeouts**, and **Automatic Retries**.
+* **Lightweight Threat Protection:** Basic security measures including payload size limits and IP Allowlisting/Blocklisting.
 * **Horizontal Scaling Architecture:** Designed from the ground up to operate as a cluster of stateless nodes.
 
 ### 3.2. Observability & Visibility

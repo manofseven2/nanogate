@@ -1,16 +1,16 @@
 package com.nanogate.routing.model;
 
-import java.net.URI;
-import java.util.List;
-
 /**
- * Represents a routing rule defining how incoming requests should be forwarded.
+ * Represents a routing rule that maps a path to a named BackendSet.
+ * It can optionally override policies defined in the BackendSet, such as the load balancer
+ * or HTTP client settings.
  */
 public class Route {
     private String id;
     private String path;
-    private List<URI> targetUris;
-    private String loadBalancer;
+    private String backendSet; // Reverted to String
+    private String loadBalancer; // Optional override
+    private HttpClientProperties httpClient; // Optional override
 
     public String getId() {
         return id;
@@ -28,12 +28,12 @@ public class Route {
         this.path = path;
     }
 
-    public List<URI> getTargetUris() {
-        return targetUris;
+    public String getBackendSet() {
+        return backendSet;
     }
 
-    public void setTargetUris(List<URI> targetUris) {
-        this.targetUris = targetUris;
+    public void setBackendSet(String backendSet) {
+        this.backendSet = backendSet;
     }
 
     public String getLoadBalancer() {
@@ -42,5 +42,13 @@ public class Route {
 
     public void setLoadBalancer(String loadBalancer) {
         this.loadBalancer = loadBalancer;
+    }
+
+    public HttpClientProperties getHttpClient() {
+        return httpClient;
+    }
+
+    public void setHttpClient(HttpClientProperties httpClient) {
+        this.httpClient = httpClient;
     }
 }

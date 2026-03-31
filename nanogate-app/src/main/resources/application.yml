@@ -1,29 +1,26 @@
-# Enable Virtual Threads for all incoming web requests
+# This is the base configuration file.
+# Properties defined here are common to all profiles or serve as a default.
+
+# Default Logging Configuration
+logging:
+  level:
+    root: WARN
+    com.nanogate: INFO
+
+# Spring Boot Configuration
 spring:
+  application:
+    name: NanoGate
   threads:
     virtual:
       enabled: true
 
-# NanoGate Routing Configuration
+# NanoGate Core Configuration
 nanogate:
   routing:
     enabled: true
-    routes:
-      # Route for a hypothetical "User Service"
-      - id: user-service-route
-        # Match any request starting with /api/users/
-        path: /api/users/**
-        # List of available backend servers
-        target-uris:
-          - http://localhost:8081
-          - http://localhost:8082
-        # Load balancing strategy for this route
-        load-balancer: ROUND_ROBIN
-
-      # Route for a hypothetical "Order Service"
-      - id: order-service-route
-        # Match any request starting with /api/orders/
-        path: /api/orders/**
-        target-uris:
-          - http://localhost:9090
-        load-balancer: ROUND_ROBIN
+    # Global Default HTTP Client Configuration
+    # This provides a fallback for any backend that doesn't have specific settings.
+    default-http-client:
+      connectTimeout: 5s
+      responseTimeout: 15s

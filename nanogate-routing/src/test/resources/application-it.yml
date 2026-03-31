@@ -1,0 +1,31 @@
+nanogate:
+  routing:
+    enabled: true
+    default-http-client:
+      connect-timeout: 2s
+      response-timeout: 5s
+    backend-sets:
+      - name: test-backend-1
+        load-balancer: ROUND_ROBIN
+        servers:
+          - "http://localhost:8081"
+      - name: test-backend-2
+        load-balancer: ROUND_ROBIN
+        servers:
+          - "http://localhost:8082"
+          - "http://localhost:8083"
+      - name: slow-backend
+        servers:
+          - "http://localhost:8084"
+    routes:
+      - id: exact-route
+        path: "/api/exact"
+        backend-set: test-backend-1
+      - id: load-balanced-route
+        path: "/api/lb/**"
+        backend-set: test-backend-2
+      - id: fast-timeout-route
+        path: "/api/slow"
+        backend-set: slow-backend
+        http-client:
+          response-timeout: 100ms # Very short timeout to force failure

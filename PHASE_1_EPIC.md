@@ -54,7 +54,19 @@
 *   **Inputs:** The implementation classes in the `config`, `filter`, `model`, and `service` packages.
 *   **Outputs:** A suite of passing unit tests using standard testing frameworks (e.g., JUnit 5, Mockito) that cover all classes in the specified packages.
 
-## Task 5: Containerization & Local Deployment
+## Task 5: Write Integration Tests (ITs)
+
+*   **Goal:** Verify the interactions between the routing components within a realistic Spring Boot context by writing integration tests.
+*   **Definition:**
+    1.  Configure the `maven-failsafe-plugin` in the `pom.xml` files to execute tests ending with `*IT.java` and enable parallel test execution to speed up the pipeline.
+    2.  Write integration tests covering realistic scenarios for `RoutingFilter`, `InMemoryRouteLocator`, `LoadBalancerFactory`, `RequestProxy`, and `RoundRobinLoadBalancer`.
+    3.  Tests should spin up a full or sliced Spring context to ensure that beans are correctly wired, properties are injected from YAML correctly, and the core routing chain works from end to end without excessive mocking.
+    4.  Ensure test file names follow the `*IT` suffix convention (e.g., `RoutingFilterIT.java`).
+*   **Use Case:** The application is built, and the CI/CD pipeline runs the `verify` phase. The Failsafe plugin executes the ITs concurrently, ensuring that not only do the individual components work, but they also wire together correctly as a fully functioning Spring Boot application.
+*   **Inputs:** The completed Spring Boot application context and configuration.
+*   **Outputs:** Failsafe plugin configured in `pom.xml` and passing `*IT.java` classes.
+
+## Task 6: Containerization & Local Deployment
 
 *   **Goal:** Package NanoGate into a standardized Docker image for consistent deployment across environments.
 *   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
@@ -62,7 +74,7 @@
 *   **Inputs:** Compiled application artifact (`.jar` file).
 *   **Outputs:** A functional `Dockerfile` and `docker-compose.yml`.
 
-## Task 6: Future - Least Connections Load Balancer
+## Task 7: Future - Least Connections Load Balancer
 
 *   **Goal:** Implement a more dynamic load balancing algorithm that adapts to server load.
 *   **Definition:** Create a new `LeastConnectionsLoadBalancer` that implements the `LoadBalancer` interface. This implementation will need to track the number of active connections to each backend URI within a `BackendSet`. The design should consider both a simple in-memory implementation for local state and a future-proof hook for using a distributed cache (like Redis) for global state.

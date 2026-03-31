@@ -54,8 +54,9 @@ public class RequestProxy {
         }));
 
         // Construct the new target URI, preserving query parameters
-        String newPath = targetUri.getPath() + request.getRequestURI().substring(request.getContextPath().length());
-        URI finalTargetUri = URI.create(targetUri.getScheme() + "://" + targetUri.getAuthority() + newPath + (request.getQueryString() != null ? "?" + request.getQueryString() : ""));
+        String queryString = request.getQueryString();
+        String finalPath = targetUri.getPath() + request.getRequestURI().substring(request.getContextPath().length());
+        URI finalTargetUri = URI.create(targetUri.getScheme() + "://" + targetUri.getAuthority() + finalPath + (queryString != null ? "?" + queryString : ""));
         requestBuilder.uri(finalTargetUri);
 
         // Apply response timeout if specified
@@ -63,11 +64,11 @@ public class RequestProxy {
             requestBuilder.timeout(clientProperties.getResponseTimeout());
         }
 
-        // Copy headers (excluding hop-by-hop headers)
+        // Copy headers (excluding hop-by-hop headers and Host header)
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
-            if (!isHopByHopHeader(headerName)) {
+            if (!isHopByHopHeader(headerName) && !headerName.equalsIgnoreCase("host") && !headerName.equalsIgnoreCase("content-length")) {
                 Enumeration<String> headerValues = request.getHeaders(headerName);
                 while (headerValues.hasMoreElements()) {
                     requestBuilder.header(headerName, headerValues.nextElement());
@@ -82,12 +83,15 @@ public class RequestProxy {
         response.setStatus(backendResponse.statusCode());
 
         backendResponse.headers().map().forEach((name, values) -> {
-            if (!isHopByHopHeader(name)) {
+            if (!isHopByHopHeader(name) && !name.equalsIgnoreCase("content-length") && !name.equalsIgnoreCase("transfer-encoding")) {
                 values.forEach(value -> response.addHeader(name, value));
             }
         });
 
-        response.getOutputStream().write(backendResponse.body());
+        // if there's a body to write
+        if (backendResponse.body() != null) {
+             response.getOutputStream().write(backendResponse.body());
+        }
     }
 
     private boolean isHopByHopHeader(String headerName) {

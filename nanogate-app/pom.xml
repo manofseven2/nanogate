@@ -95,6 +95,11 @@
                     <mainClass>com.nanogate.app.NanoGateApplication</mainClass>
                 </configuration>
             </plugin>
+            <!-- Enable the Failsafe plugin configured in the parent POM -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
         </plugins>
     </build>
 

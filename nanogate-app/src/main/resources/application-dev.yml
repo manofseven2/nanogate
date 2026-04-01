@@ -1,0 +1,40 @@
+# Development Profile Configuration
+
+# This profile enables more verbose logging for easier debugging.
+logging:
+  level:
+    com.nanogate: DEBUG # Enable detailed logging for all our application packages
+
+# Development-specific routing configuration
+nanogate:
+  routing:
+    # Define backend sets for local development (e.g., pointing to localhost)
+    backend-sets:
+      - name: user-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - http://localhost:8081
+          - http://localhost:8082
+        http-client:
+          connectTimeout: 8s # Override global default
+
+      - name: order-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - http://localhost:9090
+
+    # Define routes for development
+    routes:
+      - id: user-report-route
+        path: /api/users/reports/**
+        backend-set: user-service-backend
+        http-client:
+          responseTimeout: 60s # Specific override for this slow route
+
+      - id: user-profile-route
+        path: /api/users/**
+        backend-set: user-service-backend
+
+      - id: order-service-route
+        path: /api/orders/**
+        backend-set: order-service-backend

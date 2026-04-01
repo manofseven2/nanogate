@@ -1,0 +1,26 @@
+# This is the base configuration file.
+# Properties defined here are common to all profiles or serve as a default.
+
+# Default Logging Configuration
+logging:
+  level:
+    root: WARN
+    com.nanogate: INFO
+
+# Spring Boot Configuration
+spring:
+  application:
+    name: NanoGate
+  threads:
+    virtual:
+      enabled: true
+
+# NanoGate Core Configuration
+nanogate:
+  routing:
+    enabled: true
+    # Global Default HTTP Client Configuration
+    # This provides a fallback for any backend that doesn't have specific settings.
+    default-http-client:
+      connectTimeout: 5s
+      responseTimeout: 15s

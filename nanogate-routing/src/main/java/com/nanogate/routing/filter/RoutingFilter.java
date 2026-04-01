@@ -4,6 +4,7 @@ import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
+import com.nanogate.routing.service.ActiveConnectionTracker;
 import com.nanogate.routing.service.LoadBalancerFactory;
 import com.nanogate.routing.service.RouteLocator;
 import com.nanogate.routing.service.RequestProxy;
@@ -38,12 +39,18 @@ public class RoutingFilter implements Filter {
     private final RouteLocator routeLocator;
     private final LoadBalancerFactory loadBalancerFactory;
     private final RequestProxy requestProxy;
+    private final ActiveConnectionTracker connectionTracker;
 
-    public RoutingFilter(NanoGateRouteProperties properties, RouteLocator routeLocator, LoadBalancerFactory loadBalancerFactory, RequestProxy requestProxy) {
+    public RoutingFilter(NanoGateRouteProperties properties, 
+                         RouteLocator routeLocator, 
+                         LoadBalancerFactory loadBalancerFactory, 
+                         RequestProxy requestProxy,
+                         ActiveConnectionTracker connectionTracker) {
         this.properties = properties;
         this.routeLocator = routeLocator;
         this.loadBalancerFactory = loadBalancerFactory;
         this.requestProxy = requestProxy;
+        this.connectionTracker = connectionTracker;
     }
 
     @Override
@@ -88,10 +95,13 @@ public class RoutingFilter implements Filter {
             return;
         }
 
-        // 4. Proxy the request
+        // 4. Proxy the request and track connections
         URI targetUri = optionalTargetUri.get();
         log.info("Proxying request for route '{}' to backend: {}", route.getId(), targetUri);
 
+        // Notify the tracker that a new connection is starting
+        connectionTracker.increment(targetUri);
+        
         try {
             requestProxy.proxyRequest(request, response, targetUri, clientProperties);
         } catch (InterruptedException e) {
@@ -101,6 +111,9 @@ public class RoutingFilter implements Filter {
         } catch (Exception e) {
             log.error("Error proxying request for route '{}' to {}: {}", route.getId(), targetUri, e.getMessage());
             response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Error proxying request to backend.");
+        } finally {
+            // Guaranteed to decrement, even if the proxy request fails, times out, or the client disconnects early.
+            connectionTracker.decrement(targetUri);
         }
     }
 

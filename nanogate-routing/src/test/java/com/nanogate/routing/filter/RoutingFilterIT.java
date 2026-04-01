@@ -15,6 +15,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +38,8 @@ class RoutingFilterIT {
     private static WireMockServer backend2;
     private static WireMockServer backend3;
     private static WireMockServer slowBackend;
+    private static WireMockServer leastConnBackend1;
+    private static WireMockServer leastConnBackend2;
 
     @BeforeAll
     static void startServers() {
@@ -43,11 +48,15 @@ class RoutingFilterIT {
         backend2 = new WireMockServer(WireMockConfiguration.options().port(8082));
         backend3 = new WireMockServer(WireMockConfiguration.options().port(8083));
         slowBackend = new WireMockServer(WireMockConfiguration.options().port(8084));
+        leastConnBackend1 = new WireMockServer(WireMockConfiguration.options().port(8085));
+        leastConnBackend2 = new WireMockServer(WireMockConfiguration.options().port(8086));
 
         backend1.start();
         backend2.start();
         backend3.start();
         slowBackend.start();
+        leastConnBackend1.start();
+        leastConnBackend2.start();
     }
 
     @AfterAll
@@ -56,6 +65,8 @@ class RoutingFilterIT {
         if (backend2 != null) backend2.stop();
         if (backend3 != null) backend3.stop();
         if (slowBackend != null) slowBackend.stop();
+        if (leastConnBackend1 != null) leastConnBackend1.stop();
+        if (leastConnBackend2 != null) leastConnBackend2.stop();
     }
 
     private String getBaseUrl() {
@@ -191,5 +202,55 @@ class RoutingFilterIT {
         assertEquals(200, response.statusCode());
         assertTrue(response.headers().map().containsKey("X-Custom-Resp".toLowerCase())); // Java HttpClient headers are lowercase
         assertEquals("resp-val", response.headers().firstValue("X-Custom-Resp").orElse(""));
+    }
+
+    @Test
+    void testLeastConnectionsLoadBalancer() throws Exception {
+        // We configure leastConnBackend1 to be very slow, simulating high load
+        leastConnBackend1.stubFor(get(urlEqualTo("/api/lc/item"))
+                .willReturn(aResponse()
+                        .withFixedDelay(1000)
+                        .withStatus(200)
+                        .withBody("slow-backend-1")));
+
+        // We configure leastConnBackend2 to be very fast
+        leastConnBackend2.stubFor(get(urlEqualTo("/api/lc/item"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withBody("fast-backend-2")));
+
+        // Fire off multiple requests concurrently
+        List<CompletableFuture<HttpResponse<String>>> futures = new ArrayList<>();
+        
+        for (int i = 0; i < 5; i++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(getBaseUrl() + "/api/lc/item"))
+                    .GET()
+                    .build();
+            futures.add(httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()));
+            
+            // tiny delay to ensure the first request hits the slow backend and stays open
+            Thread.sleep(50);
+        }
+
+        // Wait for all to complete
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        int backend1Count = 0;
+        int backend2Count = 0;
+
+        for (CompletableFuture<HttpResponse<String>> future : futures) {
+            HttpResponse<String> response = future.get();
+            assertEquals(200, response.statusCode());
+            if ("slow-backend-1".equals(response.body())) backend1Count++;
+            if ("fast-backend-2".equals(response.body())) backend2Count++;
+        }
+
+        // With Least Connections, the slow backend should only receive 1 request (the first one).
+        // While it is busy (sleeping for 1000ms), its active connection count is 1.
+        // The fast backend will process all subsequent requests because its active connection count drops back to 0 instantly.
+        assertTrue(backend2Count > backend1Count);
+        assertEquals(1, backend1Count, "Slow backend should only handle 1 request");
+        assertEquals(4, backend2Count, "Fast backend should handle the rest");
     }
 }

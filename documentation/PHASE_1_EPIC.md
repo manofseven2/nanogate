@@ -66,18 +66,18 @@
 *   **Inputs:** The completed Spring Boot application context and configuration.
 *   **Outputs:** Failsafe plugin configured in `pom.xml` and passing `*IT.java` classes.
 
-## Task 6: Containerization & Local Deployment
-
-*   **Goal:** Package NanoGate into a standardized Docker image for consistent deployment across environments.
-*   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
-*   **Use Case:** A QA engineer can run `docker-compose up` to test the new Backend Set routing logic without needing a local Java environment.
-*   **Inputs:** Compiled application artifact (`.jar` file).
-*   **Outputs:** A functional `Dockerfile` and `docker-compose.yml`.
-
-## Task 7: Future - Least Connections Load Balancer
+## Task 6: Least Connections Load Balancer
 
 *   **Goal:** Implement a more dynamic load balancing algorithm that adapts to server load.
 *   **Definition:** Create a new `LeastConnectionsLoadBalancer` that implements the `LoadBalancer` interface. This implementation will need to track the number of active connections to each backend URI within a `BackendSet`. The design should consider both a simple in-memory implementation for local state and a future-proof hook for using a distributed cache (like Redis) for global state.
 *   **Use Case:** A backend service has two instances. Instance A is busy processing a slow request. The gateway receives a new request and, seeing that Instance B has zero active connections, forwards the request to Instance B.
 *   **Inputs:** A mechanism to track active connection counts per URI (e.g., an in-memory map of AtomicIntegers).
 *   **Outputs:** The backend URI with the lowest number of active connections.
+
+## Task 7: Containerization & Local Deployment
+
+*   **Goal:** Package NanoGate into a standardized Docker image for consistent deployment across environments.
+*   **Definition:** Write a `Dockerfile` to build a lightweight container image for the NanoGate application. Provide a `docker-compose.yml` file to easily spin up NanoGate alongside a dummy backend service for local testing.
+*   **Use Case:** A QA engineer can run `docker-compose up` to test the new Backend Set routing logic without needing a local Java environment.
+*   **Inputs:** Compiled application artifact (`.jar` file).
+*   **Outputs:** A functional `Dockerfile` and `docker-compose.yml`.

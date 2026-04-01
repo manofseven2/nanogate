@@ -4,6 +4,7 @@ import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
+import com.nanogate.routing.service.ActiveConnectionTracker;
 import com.nanogate.routing.service.LoadBalancer;
 import com.nanogate.routing.service.LoadBalancerFactory;
 import com.nanogate.routing.service.RequestProxy;
@@ -36,6 +37,8 @@ class RoutingFilterTest {
     private LoadBalancerFactory loadBalancerFactory;
     @Mock
     private RequestProxy requestProxy;
+    @Mock
+    private ActiveConnectionTracker connectionTracker;
 
     @Mock
     private HttpServletRequest request;
@@ -73,6 +76,7 @@ class RoutingFilterTest {
 
         verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "No route found for the requested path.");
         verifyNoInteractions(requestProxy);
+        verifyNoInteractions(connectionTracker);
     }
 
     @Test
@@ -84,6 +88,7 @@ class RoutingFilterTest {
 
         verify(response).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Gateway configuration error.");
         verifyNoInteractions(requestProxy);
+        verifyNoInteractions(connectionTracker);
     }
 
     @Test
@@ -97,10 +102,11 @@ class RoutingFilterTest {
 
         verify(response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "No backend instances available for this service.");
         verifyNoInteractions(requestProxy);
+        verifyNoInteractions(connectionTracker);
     }
 
     @Test
-    void doFilter_ProxyThrowsInterruptedException_ShouldSend503() throws Exception {
+    void doFilter_ProxyThrowsInterruptedException_ShouldSend503AndDecrementTracker() throws Exception {
         when(routeLocator.findRoute(request)).thenReturn(Optional.of(route));
         when(properties.getBackendSet("backend1")).thenReturn(backendSet);
         when(loadBalancerFactory.getLoadBalancer(any())).thenReturn(Optional.of(loadBalancer));
@@ -111,10 +117,14 @@ class RoutingFilterTest {
         routingFilter.doFilter(request, response, filterChain);
 
         verify(response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Gateway interrupted while proxying request.");
+        
+        // Verify tracking logic was executed even on exception
+        verify(connectionTracker).increment(targetUri);
+        verify(connectionTracker).decrement(targetUri);
     }
 
     @Test
-    void doFilter_ProxyThrowsGenericException_ShouldSend502() throws Exception {
+    void doFilter_ProxyThrowsGenericException_ShouldSend502AndDecrementTracker() throws Exception {
         when(routeLocator.findRoute(request)).thenReturn(Optional.of(route));
         when(properties.getBackendSet("backend1")).thenReturn(backendSet);
         when(loadBalancerFactory.getLoadBalancer(any())).thenReturn(Optional.of(loadBalancer));
@@ -125,10 +135,14 @@ class RoutingFilterTest {
         routingFilter.doFilter(request, response, filterChain);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_GATEWAY, "Error proxying request to backend.");
+        
+        // Verify tracking logic was executed even on exception
+        verify(connectionTracker).increment(targetUri);
+        verify(connectionTracker).decrement(targetUri);
     }
 
     @Test
-    void doFilter_SuccessfulProxy_ShouldNotSendError() throws Exception {
+    void doFilter_SuccessfulProxy_ShouldNotSendErrorAndTrackConnections() throws Exception {
         when(routeLocator.findRoute(request)).thenReturn(Optional.of(route));
         when(properties.getBackendSet("backend1")).thenReturn(backendSet);
         when(loadBalancerFactory.getLoadBalancer(any())).thenReturn(Optional.of(loadBalancer));
@@ -138,5 +152,9 @@ class RoutingFilterTest {
 
         verify(requestProxy).proxyRequest(eq(request), eq(response), eq(targetUri), any(HttpClientProperties.class));
         verify(response, never()).sendError(anyInt(), anyString());
+        
+        // Verify tracking logic wrapped the successful call
+        verify(connectionTracker).increment(targetUri);
+        verify(connectionTracker).decrement(targetUri);
     }
 }

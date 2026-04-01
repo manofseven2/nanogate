@@ -17,6 +17,11 @@ nanogate:
       - name: slow-backend
         servers:
           - "http://localhost:8084"
+      - name: least-connections-backend
+        load-balancer: LEAST_CONNECTIONS
+        servers:
+          - "http://localhost:8085"
+          - "http://localhost:8086"
     routes:
       - id: exact-route
         path: "/api/exact"
@@ -29,3 +34,6 @@ nanogate:
         backend-set: slow-backend
         http-client:
           response-timeout: 100ms # Very short timeout to force failure
+      - id: least-connections-route
+        path: "/api/lc/**"
+        backend-set: least-connections-backend

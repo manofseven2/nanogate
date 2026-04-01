@@ -84,6 +84,8 @@ class RequestProxyTest {
         when(mockRequest.getHeaderNames()).thenReturn(headerNames);
         when(mockRequest.getHeaders("Content-Type")).thenReturn(Collections.enumeration(List.of("application/json")));
 
+        when(mockRequest.getInputStream()).thenReturn(new TestServletInputStream("test-body".getBytes()));
+
         // Mock outgoing HTTP Response
         when(mockHttpResponse.statusCode()).thenReturn(201);
         when(mockHttpResponse.body()).thenReturn("response-body".getBytes());
@@ -129,6 +131,7 @@ class RequestProxyTest {
         when(mockRequest.getContextPath()).thenReturn("");
         when(mockRequest.getQueryString()).thenReturn(null);
         when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+        when(mockRequest.getInputStream()).thenReturn(new TestServletInputStream(new byte[0]));
 
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn(new byte[0]);
@@ -137,7 +140,8 @@ class RequestProxyTest {
         // Mocking the generic method send correctly
         doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<byte[]>>any());
 
-        when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
+        // Use lenient here because the response body is empty (length 0), so it might not write to the output stream
+        lenient().when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
 
         requestProxy.proxyRequest(mockRequest, mockResponse, targetUri, properties);
 

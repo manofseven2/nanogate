@@ -84,7 +84,6 @@ class RequestProxyTest {
         when(mockRequest.getHeaderNames()).thenReturn(headerNames);
         when(mockRequest.getHeaders("Content-Type")).thenReturn(Collections.enumeration(List.of("application/json")));
 
-        when(mockRequest.getInputStream()).thenReturn(new TestServletInputStream("test-body".getBytes()));
 
         // Mock outgoing HTTP Response
         when(mockHttpResponse.statusCode()).thenReturn(201);
@@ -131,7 +130,6 @@ class RequestProxyTest {
         when(mockRequest.getContextPath()).thenReturn("");
         when(mockRequest.getQueryString()).thenReturn(null);
         when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
-        when(mockRequest.getInputStream()).thenReturn(new TestServletInputStream(new byte[0]));
 
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn(new byte[0]);

@@ -1,0 +1,34 @@
+version: '3.8'
+
+# This Docker Compose file is for local development and testing.
+# It starts the NanoGate API Gateway and a mock backend service.
+
+services:
+  # The NanoGate API Gateway
+  nanogate:
+    # This uses the image built locally by the Jib Maven plugin.
+    # To build the image, run this command from the project root:
+    # mvn clean package -Pbuild-docker-image
+    image: nanogate:latest
+    ports:
+      - "8080:8080"
+    environment:
+      # Example of how to override application.yml properties for testing.
+      # This points the first backend set to the internal mock-backend service.
+      - NANO_GATE_ROUTING_BACKEND-SETS[0]_SERVERS[0]=http://mock-backend
+    depends_on:
+      - mock-backend
+
+  # A simple mock backend service that echoes back request information
+  mock-backend:
+    image: mendhak/http-https-echo:33
+    # This service is not exposed to the host. It's only accessible
+    # from within the Docker network by the nanogate service.
+    # The default port for this image is 80.
+    
+# To run this setup:
+# 1. Build the Docker image: mvn clean package -Pbuild-docker-image
+# 2. Start the services: docker-compose up
+#
+# You can then send requests to http://localhost:8080/
+# and configure routes in your application.yml to point to http://mock-backend

@@ -74,16 +74,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -102,5 +92,45 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>build-docker-image</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-maven-plugin</artifactId>
+                        <version>3.4.3</version>
+                        <configuration>
+                            <from>
+                                <image>eclipse-temurin:25-jre-jammy</image>
+                            </from>
+                            <to>
+                                <!-- This image name is used for the local tarball -->
+                                <image>nanogate:${project.version}</image>
+                            </to>
+                            <!-- Remove multi-architecture support for local buildTar -->
+                            <container>
+                                <mainClass>com.nanogate.app.NanoGateApplication</mainClass>
+                                <ports>
+                                    <port>8080</port>
+                                </ports>
+                            </container>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <!-- This goal builds an image tarball to target/jib-image.tar -->
+                                    <goal>buildTar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

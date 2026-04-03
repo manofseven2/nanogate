@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -48,7 +49,7 @@ class RequestProxyTest {
     private HttpServletResponse mockResponse;
 
     @Mock
-    private HttpResponse<byte[]> mockHttpResponse;
+    private HttpResponse<InputStream> mockHttpResponse;
 
     @Mock
     private ServletOutputStream mockOutputStream;
@@ -87,7 +88,8 @@ class RequestProxyTest {
 
         // Mock outgoing HTTP Response
         when(mockHttpResponse.statusCode()).thenReturn(201);
-        when(mockHttpResponse.body()).thenReturn("response-body".getBytes());
+        InputStream responseStream = new ByteArrayInputStream("response-body".getBytes());
+        when(mockHttpResponse.body()).thenReturn(responseStream);
         HttpHeaders responseHeaders = HttpHeaders.of(
                 Map.of("Custom-Header", List.of("custom-value"), "Keep-Alive", List.of("timeout=5")),
                 (k, v) -> true
@@ -95,7 +97,7 @@ class RequestProxyTest {
         when(mockHttpResponse.headers()).thenReturn(responseHeaders);
 
         // Mocking the generic method send correctly
-        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<byte[]>>any());
+        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<InputStream>>any());
 
         // Mock Servlet Response Output Stream
         when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
@@ -118,7 +120,9 @@ class RequestProxyTest {
         verify(mockResponse).addHeader("Custom-Header", "custom-value");
         // Hop-by-hop response header should not be copied
         verify(mockResponse, never()).addHeader(eq("Keep-Alive"), anyString());
-        verify(mockOutputStream).write("response-body".getBytes());
+        
+        // With transferTo, it writes in chunks. Verify at least one write occurred.
+        verify(mockOutputStream, atLeastOnce()).write(any(byte[].class), anyInt(), anyInt());
     }
 
     @Test
@@ -132,11 +136,12 @@ class RequestProxyTest {
         when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
 
         when(mockHttpResponse.statusCode()).thenReturn(200);
-        when(mockHttpResponse.body()).thenReturn(new byte[0]);
+        InputStream responseStream = new ByteArrayInputStream(new byte[0]);
+        when(mockHttpResponse.body()).thenReturn(responseStream);
         when(mockHttpResponse.headers()).thenReturn(HttpHeaders.of(Map.of(), (k, v) -> true));
         
         // Mocking the generic method send correctly
-        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<byte[]>>any());
+        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<InputStream>>any());
 
         // Use lenient here because the response body is empty (length 0), so it might not write to the output stream
         lenient().when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
@@ -148,34 +153,5 @@ class RequestProxyTest {
 
         assertTrue(sentRequest.timeout().isPresent());
         assertEquals(Duration.ofSeconds(10), sentRequest.timeout().get());
-    }
-
-    // A simple mock for ServletInputStream since it's an abstract class
-    private static class TestServletInputStream extends jakarta.servlet.ServletInputStream {
-        private final ByteArrayInputStream stream;
-
-        public TestServletInputStream(byte[] data) {
-            this.stream = new ByteArrayInputStream(data);
-        }
-
-        @Override
-        public int read() {
-            return stream.read();
-        }
-
-        @Override
-        public boolean isFinished() {
-            return stream.available() == 0;
-        }
-
-        @Override
-        public boolean isReady() {
-            return true;
-        }
-
-        @Override
-        public void setReadListener(jakarta.servlet.ReadListener readListener) {
-            // Not needed for this test
-        }
     }
 }

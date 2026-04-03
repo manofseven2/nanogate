@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -76,10 +77,10 @@ public class RequestProxy {
             }
         }
 
-        // 2. Send the request
-        HttpResponse<byte[]> backendResponse = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
+        // 2. Send the request and expect an InputStream for the body (Streaming)
+        HttpResponse<InputStream> backendResponse = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream());
 
-        // 3. Copy backend response to original HttpServletResponse
+        // 3. Copy backend response headers to original HttpServletResponse FIRST
         response.setStatus(backendResponse.statusCode());
 
         backendResponse.headers().map().forEach((name, values) -> {
@@ -88,9 +89,20 @@ public class RequestProxy {
             }
         });
 
-        // if there's a body to write
-        if (backendResponse.body() != null) {
-             response.getOutputStream().write(backendResponse.body());
+        // 4. Stream the body to the client
+        // Using transferTo() which inherently uses an 8192-byte buffer under the hood in the JDK.
+        // This blocks the Virtual Thread if the client is slow, naturally propagating TCP backpressure
+        // to the backend without causing OutOfMemoryErrors on the gateway.
+        try (InputStream bodyStream = backendResponse.body()) {
+            if (bodyStream != null) {
+                bodyStream.transferTo(response.getOutputStream());
+                // Flush the output stream at the end to ensure all remaining bytes are sent
+                response.getOutputStream().flush();
+            }
+        } catch (IOException e) {
+            // Client likely disconnected or pipe broke during streaming.
+            // Virtual thread terminates cleanly.
+            throw new IOException("Error while streaming response to client", e);
         }
     }
 

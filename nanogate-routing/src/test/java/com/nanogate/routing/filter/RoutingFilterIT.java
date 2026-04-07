@@ -3,9 +3,11 @@ package com.nanogate.routing.filter;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.nanogate.routing.NanoGateRoutingTestApp;
+import com.nanogate.routing.service.ActiveHealthCheckService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
@@ -30,6 +32,9 @@ class RoutingFilterIT {
     @LocalServerPort
     private int localPort;
 
+    @Autowired
+    private ActiveHealthCheckService healthCheckService;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))
             .build();
@@ -40,16 +45,19 @@ class RoutingFilterIT {
     private static WireMockServer slowBackend;
     private static WireMockServer leastConnBackend1;
     private static WireMockServer leastConnBackend2;
+    private static WireMockServer healthCheckBackend1;
+    private static WireMockServer healthCheckBackend2;
 
     @BeforeAll
     static void startServers() {
-        // Start WireMock servers on ports matching application-it.yml
         backend1 = new WireMockServer(WireMockConfiguration.options().port(8081));
         backend2 = new WireMockServer(WireMockConfiguration.options().port(8082));
         backend3 = new WireMockServer(WireMockConfiguration.options().port(8083));
         slowBackend = new WireMockServer(WireMockConfiguration.options().port(8084));
         leastConnBackend1 = new WireMockServer(WireMockConfiguration.options().port(8085));
         leastConnBackend2 = new WireMockServer(WireMockConfiguration.options().port(8086));
+        healthCheckBackend1 = new WireMockServer(WireMockConfiguration.options().port(8088));
+        healthCheckBackend2 = new WireMockServer(WireMockConfiguration.options().port(8089));
 
         backend1.start();
         backend2.start();
@@ -57,6 +65,8 @@ class RoutingFilterIT {
         slowBackend.start();
         leastConnBackend1.start();
         leastConnBackend2.start();
+        healthCheckBackend1.start();
+        healthCheckBackend2.start();
     }
 
     @AfterAll
@@ -67,6 +77,8 @@ class RoutingFilterIT {
         if (slowBackend != null) slowBackend.stop();
         if (leastConnBackend1 != null) leastConnBackend1.stop();
         if (leastConnBackend2 != null) leastConnBackend2.stop();
+        if (healthCheckBackend1 != null) healthCheckBackend1.stop();
+        if (healthCheckBackend2 != null) healthCheckBackend2.stop();
     }
 
     private String getBaseUrl() {
@@ -252,5 +264,45 @@ class RoutingFilterIT {
         assertTrue(backend2Count > backend1Count);
         assertEquals(1, backend1Count, "Slow backend should only handle 1 request");
         assertEquals(4, backend2Count, "Fast backend should handle the rest");
+    }
+
+    @Test
+    void testHealthCheck_ExcludesUnhealthyServerFromLoadBalancing() throws Exception {
+        // Initially, both servers are healthy
+        healthCheckBackend1.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(200)));
+        healthCheckBackend2.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(200)));
+
+        // Stub the actual API endpoint
+        healthCheckBackend1.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-1")));
+        healthCheckBackend2.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-2")));
+
+        // Manually trigger health check to establish baseline
+        healthCheckService.runHealthChecks();
+        Thread.sleep(200); // Allow async checks to complete
+
+        // Now, make one server unhealthy
+        healthCheckBackend1.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(503)));
+
+        // Trigger health check again to detect the failure
+        healthCheckService.runHealthChecks();
+        Thread.sleep(200); // Allow async checks to complete
+
+        // Send multiple requests. All should go to the healthy backend (backend-2).
+        int backend1Count = 0;
+        int backend2Count = 0;
+        for (int i = 0; i < 4; i++) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(getBaseUrl() + "/api/health-test/data"))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            assertEquals(200, response.statusCode());
+            if ("backend-1".equals(response.body())) backend1Count++;
+            if ("backend-2".equals(response.body())) backend2Count++;
+        }
+
+        assertEquals(0, backend1Count, "Unhealthy server should receive no traffic");
+        assertEquals(4, backend2Count, "Healthy server should receive all traffic");
     }
 }

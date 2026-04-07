@@ -17,6 +17,10 @@ nanogate:
           - http://localhost:8082
         http-client:
           connectTimeout: 8s # Override global default
+        health-check:
+          path: /health
+          interval: 10s
+          timeout: 2s
 
       - name: order-service-backend
         load-balancer: ROUND_ROBIN

@@ -12,6 +12,7 @@ public class BackendSet {
     private String loadBalancer;
     private List<URI> servers;
     private HttpClientProperties httpClient;
+    private HealthCheckProperties healthCheck;
 
     public String getName() {
         return name;
@@ -43,5 +44,13 @@ public class BackendSet {
 
     public void setHttpClient(HttpClientProperties httpClient) {
         this.httpClient = httpClient;
+    }
+
+    public HealthCheckProperties getHealthCheck() {
+        return healthCheck;
+    }
+
+    public void setHealthCheck(HealthCheckProperties healthCheck) {
+        this.healthCheck = healthCheck;
     }
 }

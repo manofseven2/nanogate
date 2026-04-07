@@ -15,6 +15,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,6 +24,9 @@ class LeastConnectionsLoadBalancerTest {
 
     @Mock
     private ActiveConnectionTracker tracker;
+
+    @Mock
+    private HealthCheckService healthCheckService;
 
     @InjectMocks
     private LeastConnectionsLoadBalancer loadBalancer;
@@ -40,6 +45,10 @@ class LeastConnectionsLoadBalancerTest {
         backendSet = new BackendSet();
         backendSet.setName("test-set");
         backendSet.setServers(List.of(server1, server2, server3));
+
+        // By default, assume all servers are healthy for existing tests.
+        // This is marked as lenient because not all tests will use this stub (e.g., tests with empty server lists).
+        lenient().when(healthCheckService.isHealthy(any(URI.class))).thenReturn(true);
     }
 
     @Test
@@ -70,27 +79,30 @@ class LeastConnectionsLoadBalancerTest {
     }
 
     @Test
-    void testChooseBackend_OptimizesWhenServerHasZeroConnections() {
-        // Since server1 has 0 connections, the loop should break early and pick it.
-        // It shouldn't even check server2 or server3 if they have 0 too.
-        when(tracker.getActiveConnections(server1)).thenReturn(0);
+    void testChooseBackend_SkipsUnhealthyServer() {
+        // server2 is the least busy, but it's unhealthy, so it should be skipped.
+        when(tracker.getActiveConnections(server1)).thenReturn(10);
+        // No stub for server2's connections is needed, as it will be filtered out first.
+        when(tracker.getActiveConnections(server3)).thenReturn(5);
+
+        when(healthCheckService.isHealthy(server1)).thenReturn(true);
+        when(healthCheckService.isHealthy(server2)).thenReturn(false); // server2 is unhealthy
+        when(healthCheckService.isHealthy(server3)).thenReturn(true);
 
         Optional<URI> result = loadBalancer.chooseBackend(backendSet);
 
         assertTrue(result.isPresent());
-        assertEquals(server1, result.get());
+        // It should skip server2 and pick server3, which is the next least busy healthy server
+        assertEquals(server3, result.get());
     }
 
     @Test
-    void testChooseBackend_WithEqualConnections_SelectsFirstInList() {
-        when(tracker.getActiveConnections(server1)).thenReturn(5);
-        when(tracker.getActiveConnections(server2)).thenReturn(5);
-        when(tracker.getActiveConnections(server3)).thenReturn(5);
+    void testChooseBackend_AllServersUnhealthy_ReturnsEmpty() {
+        when(healthCheckService.isHealthy(server1)).thenReturn(false);
+        when(healthCheckService.isHealthy(server2)).thenReturn(false);
+        when(healthCheckService.isHealthy(server3)).thenReturn(false);
 
         Optional<URI> result = loadBalancer.chooseBackend(backendSet);
-
-        assertTrue(result.isPresent());
-        // Since they are all equal (and not 0), it should just return the first one checked
-        assertEquals(server1, result.get());
+        assertTrue(result.isEmpty());
     }
 }

@@ -22,6 +22,15 @@ nanogate:
         servers:
           - "http://localhost:8085"
           - "http://localhost:8086"
+      - name: health-check-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - "http://localhost:8088"
+          - "http://localhost:8089"
+        health-check:
+          path: /health
+          interval: 1s # Check frequently for the test
+          timeout: 500ms
     routes:
       - id: exact-route
         path: "/api/exact"
@@ -37,3 +46,6 @@ nanogate:
       - id: least-connections-route
         path: "/api/lc/**"
         backend-set: least-connections-backend
+      - id: health-check-route
+        path: "/api/health-test/**"
+        backend-set: health-check-backend

@@ -37,7 +37,7 @@ public class NanoGateRouteProperties {
 
     /**
      * This method is automatically called after Spring has finished populating the properties.
-     * It validates that all routes point to existing backend-sets.
+     * It validates that all routes point to existing backend-sets and warns about unmonitored sets.
      *
      * @throws IllegalStateException if a route references a non-existent backend-set.
      */
@@ -54,6 +54,13 @@ public class NanoGateRouteProperties {
                                 return existing;
                             }
                     ));
+            
+            // Log warnings for unmonitored backend sets
+            for (BackendSet backendSet : backendSets) {
+                if (backendSet.getHealthCheck() == null) {
+                    log.warn("BackendSet '{}' does not have a health-check configured. Servers in this set will be assumed healthy and will not be actively monitored.", backendSet.getName());
+                }
+            }
         }
 
         // If routing is enabled, validate the routes.

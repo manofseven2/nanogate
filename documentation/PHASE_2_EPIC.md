@@ -18,21 +18,24 @@
     1.  Create a `HealthCheckProperties` model (e.g., `path`, `interval`, `timeout`) and add it to the `BackendSet` configuration.
     2.  Create a thread-safe `HealthRegistry` (e.g., `ConcurrentHashMap<URI, Boolean>`) to store the UP/DOWN status of every individual backend URI.
     3.  Create a `@Scheduled` background task (`ActiveHealthChecker`) that periodically iterates through all configured URIs, sends an HTTP GET request to their health path, and updates the `HealthRegistry`.
+    4.  If a `BackendSet` does not have a `health-check` block, its servers will not be monitored and will be assumed healthy by default.
 
 ## Task 3: Load Balancer Health Integration
 *   **Goal:** Ensure the routing engine completely bypasses unhealthy backend instances.
 *   **Definition:**
-    1.  Inject the `HealthRegistry` into the `RoundRobinLoadBalancer` and `LeastConnectionsLoadBalancer`.
-    2.  Modify the `chooseBackend` logic: Before returning a URI, verify that it is marked as healthy in the registry.
+    1.  Inject the `HealthCheckService` into the `RoundRobinLoadBalancer` and `LeastConnectionsLoadBalancer`.
+    2.  Modify the `chooseBackend` logic: Before returning a URI, verify that `healthCheckService.isHealthy(uri)` is true.
     3.  If the chosen URI is `DOWN`, the load balancer must skip it and calculate the next available healthy server in the pool.
     4.  If *all* servers in a `BackendSet` are `DOWN`, return a `503 Service Unavailable` immediately.
 
-## Task 4: Actuator Health Visibility
-*   **Goal:** Expose the granular, per-URI health status to monitoring platforms (like Azure Monitor or Prometheus).
+## Task 4: Actuator Health Visibility & Startup Warnings
+*   **Goal:** Expose the granular, per-URI health status to monitoring platforms and warn developers about unmonitored services.
 *   **Definition:**
     1.  Add the `spring-boot-starter-actuator` dependency to the project.
     2.  Implement a custom Spring `HealthIndicator` bean (`NanoGateHealthIndicator`).
-    3.  This bean will read the state of the `HealthRegistry` and format it into a detailed JSON response for the `/actuator/health` endpoint, showing exactly which nodes are UP or DOWN.
+    3.  The `HealthIndicator` will report servers with a `health-check` configured with their real-time `UP` or `DOWN` status.
+    4.  It will also explicitly report any servers belonging to a `BackendSet` **without** a `health-check` configuration, giving them a distinct status like **`UNMONITORED`**.
+    5.  Upon application startup, log a clear `WARN` message for every `BackendSet` that is missing a `health-check` configuration.
 
 ## Task 5: Integrate Resilience4j Circuit Breakers
 *   **Goal:** Provide a reactive safety net to instantly cut off traffic to a server that starts failing between scheduled active health checks.

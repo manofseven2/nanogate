@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.net.URI;
 import java.util.Optional;
@@ -66,6 +67,24 @@ class RoutingFilterTest {
         backendSet.setName("backend1");
 
         targetUri = new URI("http://localhost:8080");
+
+        // Set the actuatorBasePath field using reflection, as it's @Value injected
+        ReflectionTestUtils.setField(routingFilter, "actuatorBasePath", "/actuator");
+
+        // Provide a default stub for getRequestURI to prevent NullPointerExceptions
+        when(request.getRequestURI()).thenReturn("/api/some-path");
+    }
+
+    @Test
+    void doFilter_ActuatorPath_ShouldDelegateToFilterChain() throws Exception {
+        // Specific stub for this test to ensure we hit the actuator path
+        when(request.getRequestURI()).thenReturn("/actuator/health");
+
+        routingFilter.doFilter(request, response, filterChain);
+
+        // Verify it delegates and does nothing else
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(routeLocator, requestProxy, connectionTracker);
     }
 
     @Test
@@ -74,9 +93,10 @@ class RoutingFilterTest {
 
         routingFilter.doFilter(request, response, filterChain);
 
-        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "No route found for the requested path.");
-        verifyNoInteractions(requestProxy);
-        verifyNoInteractions(connectionTracker);
+        // Verify it sends a 404 and does not delegate
+        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
+        verify(filterChain, never()).doFilter(request, response);
+        verifyNoInteractions(requestProxy, connectionTracker);
     }
 
     @Test
@@ -87,8 +107,7 @@ class RoutingFilterTest {
         routingFilter.doFilter(request, response, filterChain);
 
         verify(response).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Gateway configuration error.");
-        verifyNoInteractions(requestProxy);
-        verifyNoInteractions(connectionTracker);
+        verifyNoInteractions(requestProxy, connectionTracker);
     }
 
     @Test
@@ -101,8 +120,7 @@ class RoutingFilterTest {
         routingFilter.doFilter(request, response, filterChain);
 
         verify(response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "No backend instances available for this service.");
-        verifyNoInteractions(requestProxy);
-        verifyNoInteractions(connectionTracker);
+        verifyNoInteractions(requestProxy, connectionTracker);
     }
 
     @Test
@@ -118,7 +136,6 @@ class RoutingFilterTest {
 
         verify(response).sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Gateway interrupted while proxying request.");
         
-        // Verify tracking logic was executed even on exception
         verify(connectionTracker).increment(targetUri);
         verify(connectionTracker).decrement(targetUri);
     }
@@ -136,7 +153,6 @@ class RoutingFilterTest {
 
         verify(response).sendError(HttpServletResponse.SC_BAD_GATEWAY, "Error proxying request to backend.");
         
-        // Verify tracking logic was executed even on exception
         verify(connectionTracker).increment(targetUri);
         verify(connectionTracker).decrement(targetUri);
     }
@@ -153,7 +169,6 @@ class RoutingFilterTest {
         verify(requestProxy).proxyRequest(eq(request), eq(response), eq(targetUri), any(HttpClientProperties.class));
         verify(response, never()).sendError(anyInt(), anyString());
         
-        // Verify tracking logic wrapped the successful call
         verify(connectionTracker).increment(targetUri);
         verify(connectionTracker).decrement(targetUri);
     }

@@ -12,13 +12,14 @@
     3.  Ensure HTTP headers and status codes are flushed to the client before body streaming begins.
 *   **Reasoning:** This leverages OS-level TCP backpressure. If a client is slow, the virtual thread blocks, naturally pausing the backend read and preventing `OutOfMemoryError`s without complex reactive frameworks. It also natively enables Server-Sent Events (SSE) and large file downloads.
 
-## Task 2: Active Health Checking Daemon
-*   **Goal:** Implement a background worker that proactively pings backend instances to maintain a real-time registry of their health status.
+## Task 2: Active Health Checking Daemon & Startup Warnings
+*   **Goal:** Implement a background worker that proactively pings backend instances, and warn developers about unmonitored services.
 *   **Definition:**
     1.  Create a `HealthCheckProperties` model (e.g., `path`, `interval`, `timeout`) and add it to the `BackendSet` configuration.
     2.  Create a thread-safe `HealthRegistry` (e.g., `ConcurrentHashMap<URI, Boolean>`) to store the UP/DOWN status of every individual backend URI.
     3.  Create a `@Scheduled` background task (`ActiveHealthChecker`) that periodically iterates through all configured URIs, sends an HTTP GET request to their health path, and updates the `HealthRegistry`.
     4.  If a `BackendSet` does not have a `health-check` block, its servers will not be monitored and will be assumed healthy by default.
+    5.  Upon application startup, log a clear `WARN` message for every `BackendSet` that is missing a `health-check` configuration.
 
 ## Task 3: Load Balancer Health Integration
 *   **Goal:** Ensure the routing engine completely bypasses unhealthy backend instances.
@@ -28,22 +29,23 @@
     3.  If the chosen URI is `DOWN`, the load balancer must skip it and calculate the next available healthy server in the pool.
     4.  If *all* servers in a `BackendSet` are `DOWN`, return a `503 Service Unavailable` immediately.
 
-## Task 4: Actuator Health Visibility & Startup Warnings
-*   **Goal:** Expose the granular, per-URI health status to monitoring platforms and warn developers about unmonitored services.
+## Task 4: Hierarchical Actuator Health Indicator
+*   **Goal:** Expose a structured, hierarchical health status for all backend sets and their individual servers, which is the industry standard for observability.
 *   **Definition:**
-    1.  Add the `spring-boot-starter-actuator` dependency to the project.
-    2.  Implement a custom Spring `HealthIndicator` bean (`NanoGateHealthIndicator`).
-    3.  The `HealthIndicator` will report servers with a `health-check` configured with their real-time `UP` or `DOWN` status.
-    4.  It will also explicitly report any servers belonging to a `BackendSet` **without** a `health-check` configuration, giving them a distinct status like **`UNMONITORED`**.
-    5.  Upon application startup, log a clear `WARN` message for every `BackendSet` that is missing a `health-check` configuration.
+    1.  Add the `spring-boot-starter-actuator` dependency.
+    2.  Implement a custom `NanoGateHealthIndicator` that provides a nested JSON output.
+    3.  The health indicator will group servers by their `BackendSet`.
+    4.  Each `BackendSet` will have its own `status` (`UP` if at least one server is healthy/unmonitored, `DOWN` otherwise).
+    5.  Each server within a `BackendSet` will have its individual status (`UP`, `DOWN`, or `UNMONITORED`).
 
-## Task 5: Integrate Resilience4j Circuit Breakers
-*   **Goal:** Provide a reactive safety net to instantly cut off traffic to a server that starts failing between scheduled active health checks.
+## Task 5: Passive Health Checking via Circuit Breakers
+*   **Goal:** Implement a reactive safety net that detects backend failures on live traffic and instantly isolates failing servers, complementing the proactive active health checks.
 *   **Definition:**
-    1.  Add `resilience4j-circuitbreaker` to the `nanogate-resilience` module.
-    2.  Create a `CircuitBreakerRegistry` configured with sensible defaults for backend routes.
-    3.  Wrap the `HttpClient.send()` execution inside `RequestProxy` with a Circuit Breaker, keyed by the target `URI`.
-    4.  Catch `CallNotPermittedException` in the `RoutingFilter`. When caught, immediately attempt to retry the request on a *different* healthy server via the Load Balancer.
+    1.  Integrate `resilience4j-circuitbreaker` into the `nanogate-resilience` module.
+    2.  Wrap the `HttpClient.send()` execution inside `RequestProxy` with a Circuit Breaker, keyed by the target `URI`.
+    3.  The Circuit Breaker will monitor for connection errors and 5xx responses on real user requests.
+    4.  If the failure rate for a specific server exceeds a threshold, the circuit will "open," causing subsequent requests to that server to fail instantly for a configured duration.
+    5.  When a `CallNotPermittedException` is caught (indicating an open circuit), the `RoutingFilter` will immediately attempt to retry the request on a *different* healthy server via the Load Balancer.
 
 ## Task 6: Header Transformation & Manipulation
 *   **Goal:** Allow administrators to shape HTTP traffic by adding, removing, or overwriting headers.

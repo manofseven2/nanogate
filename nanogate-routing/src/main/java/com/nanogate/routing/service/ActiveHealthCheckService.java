@@ -38,6 +38,7 @@ public class ActiveHealthCheckService implements HealthCheckService {
         if (!properties.isEnabled()) {
             return;
         }
+        log.debug("Running active health checks for all configured backend sets...");
 
         for (BackendSet backendSet : properties.getBackendSets()) {
             HealthCheckProperties healthCheckProps = backendSet.getHealthCheck();
@@ -50,6 +51,7 @@ public class ActiveHealthCheckService implements HealthCheckService {
     }
 
     public CompletableFuture<Void> checkServerHealth(URI serverUri, HealthCheckProperties healthCheckProps) {
+        log.debug("Pinging health check endpoint for server: {}", serverUri);
         try {
             URI healthCheckUri = new URI(serverUri.getScheme(), null, serverUri.getHost(), serverUri.getPort(), healthCheckProps.path(), null, null);
             
@@ -86,10 +88,16 @@ public class ActiveHealthCheckService implements HealthCheckService {
     }
 
     private void markAsHealthy(URI serverUri) {
-        healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(false)).set(true);
+        AtomicBoolean previousStatus = healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(false));
+        if (!previousStatus.getAndSet(true)) {
+            log.info("Backend server {} is now marked as UP", serverUri);
+        }
     }
 
     private void markAsUnhealthy(URI serverUri) {
-        healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(true)).set(false);
+        AtomicBoolean previousStatus = healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(true));
+        if (previousStatus.getAndSet(false)) {
+            log.warn("Backend server {} is now marked as DOWN", serverUri);
+        }
     }
 }

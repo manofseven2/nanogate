@@ -1,0 +1,51 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/health"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "UP"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/api/users/reports/.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "reportId": "report-123",
+          "data": "This is a sample user report."
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/api/users/.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "userId": "user-abc",
+          "name": "John Doe"
+        }
+      }
+    }
+  ]
+}

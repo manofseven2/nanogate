@@ -29,6 +29,13 @@
             <groupId>io.zipkin.reporter2</groupId>
             <artifactId>zipkin-reporter-brave</artifactId>
         </dependency>
+
+        <!-- Internal dependency to access routing configuration and health status -->
+        <dependency>
+            <groupId>com.nanogate</groupId>
+            <artifactId>nanogate-routing</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
 </project>

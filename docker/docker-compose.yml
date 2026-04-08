@@ -1,0 +1,49 @@
+version: '3.8'
+
+# This Docker Compose file sets up a mock environment for local development.
+# It uses WireMock to simulate the backend services defined in application-dev.yml.
+#
+# To run:
+# 1. Navigate to this 'docker' directory.
+# 2. Run 'docker-compose up -d'
+#
+# The mock services will be available on their respective ports (8081, 8082, 8083, 9090).
+# You can then run the NanoGate application locally, and it will route requests
+# to these mock services.
+
+services:
+  user-service-1:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-1
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose
+
+  user-service-2:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-2
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose
+
+  user-service-3-unhealthy:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-3-unhealthy
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./wiremock/mappings-unhealthy:/home/wiremock/mappings
+    command: --verbose
+
+  order-service:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-order-service
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose

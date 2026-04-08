@@ -13,8 +13,9 @@ nanogate:
       - name: user-service-backend
         load-balancer: ROUND_ROBIN
         servers:
-          - http://localhost:8081
-          - http://localhost:8082
+          - http://localhost:8081 # Healthy
+          - http://localhost:8082 # Healthy
+          - http://localhost:8083 # Intentionally Unhealthy
         http-client:
           connectTimeout: 8s # Override global default
         health-check:

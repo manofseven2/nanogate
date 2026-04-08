@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -30,7 +31,7 @@ import java.util.Optional;
  * It intercepts all incoming requests, finds a matching route, selects a backend, and proxies the request.
  */
 @Component
-@Order(1) // Ensure this filter runs early in the chain
+@Order(1) // Run this filter early, but after Spring's internal filters for actuator
 public class RoutingFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(RoutingFilter.class);
@@ -40,6 +41,9 @@ public class RoutingFilter implements Filter {
     private final LoadBalancerFactory loadBalancerFactory;
     private final RequestProxy requestProxy;
     private final ActiveConnectionTracker connectionTracker;
+
+    @Value("${management.endpoints.web.base-path:/actuator}")
+    private String actuatorBasePath;
 
     public RoutingFilter(NanoGateRouteProperties properties, 
                          RouteLocator routeLocator, 
@@ -60,11 +64,18 @@ public class RoutingFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         HttpServletResponse response = (HttpServletResponse) servletResponse;
 
+        // Explicitly allow actuator endpoints to pass through without being routed.
+        if (request.getRequestURI().startsWith(actuatorBasePath)) {
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
+
         Optional<Route> optionalRoute = routeLocator.findRoute(request);
 
         if (optionalRoute.isEmpty()) {
+            // If it's not an actuator path and no route matches, send our own generic 404.
             log.warn("No route matched for request: {} {}", request.getMethod(), request.getRequestURI());
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "No route found for the requested path.");
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
             return;
         }
 

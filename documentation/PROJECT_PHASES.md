@@ -21,10 +21,12 @@ This document outlines the phased approach for developing the **NanoGate** API G
 
 *   **Asynchronous & SSE Support:** Upgrade the routing engine to handle non-blocking asynchronous requests and support Server-Sent Events (SSE) for streaming capabilities.
 *   **Resiliency Engine:**
-    *   Implement **Circuit Breakers** to prevent cascading failures.
+    *   Implement **Circuit Breakers** for passive, real-time failure detection on live traffic.
     *   Configure **Timeouts** for backend calls.
     *   Enable **Automatic Retries** for safe, idempotent requests.
-*   **Active Health Checking:** Implement a background worker to continuously ping downstream `/health` endpoints and automatically remove unhealthy instances from the load balancer pool.
+*   **Dual-Mode Health Checking:**
+    *   **Active:** Implement a background worker to continuously ping downstream `/health` endpoints.
+    *   **Passive:** Use Circuit Breakers to detect failures on live requests, providing instant reaction time between active pings.
 *   **API Versioning:** Add native support for routing based on URL paths (`/v1/`) and HTTP headers (`Accept-Version`).
 *   **URL Rewriting:** Implement core functionality to strip or rewrite URL path prefixes before proxying requests to downstream backends.
 *   **Header Transformation:** Introduce capabilities to natively add, remove, and override HTTP headers on incoming requests and outgoing responses before routing.

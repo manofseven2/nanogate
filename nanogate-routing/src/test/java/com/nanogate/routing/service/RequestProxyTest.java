@@ -1,6 +1,9 @@
 package com.nanogate.routing.service;
 
+import com.nanogate.resilience.model.ResilienceProperties;
+import com.nanogate.resilience.service.CircuitBreakerProvider;
 import com.nanogate.routing.model.HttpClientProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,6 +29,8 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +43,9 @@ class RequestProxyTest {
 
     @Mock
     private HttpClientProvider httpClientProvider;
+    
+    @Mock
+    private CircuitBreakerProvider circuitBreakerProvider;
 
     @Mock
     private HttpClient mockHttpClient;
@@ -53,6 +61,9 @@ class RequestProxyTest {
 
     @Mock
     private ServletOutputStream mockOutputStream;
+    
+    @Mock
+    private CircuitBreaker mockCircuitBreaker;
 
     @InjectMocks
     private RequestProxy requestProxy;
@@ -62,31 +73,35 @@ class RequestProxyTest {
 
     private URI targetUri;
     private HttpClientProperties properties;
+    private ResilienceProperties resilienceProperties;
 
     @BeforeEach
     void setUp() throws Exception {
         targetUri = new URI("http://backend-service:8080");
         properties = new HttpClientProperties();
+        resilienceProperties = new ResilienceProperties(null, null, null, null, null, null);
+
+        lenient().when(httpClientProvider.getClient(any())).thenReturn(mockHttpClient);
+        lenient().when(circuitBreakerProvider.getCircuitBreaker(any(), any())).thenReturn(mockCircuitBreaker);
         
-        // This is necessary for both tests, so it stays in setUp
-        lenient().when(httpClientProvider.getClient(properties)).thenReturn(mockHttpClient);
+        // Make the mock circuit breaker execute the supplier directly
+        lenient().when(mockCircuitBreaker.executeCompletionStage(any(Supplier.class))).thenAnswer(invocation -> {
+            Supplier<CompletableFuture<HttpResponse<InputStream>>> supplier = invocation.getArgument(0);
+            return supplier.get();
+        });
     }
 
     @Test
     void testProxyRequest_BasicFlow() throws Exception {
-        // Mock incoming Servlet Request
         when(mockRequest.getMethod()).thenReturn("POST");
         when(mockRequest.getRequestURI()).thenReturn("/api/test");
         when(mockRequest.getContextPath()).thenReturn("");
         when(mockRequest.getQueryString()).thenReturn("param=value");
 
-        // Mock Headers (one normal, one hop-by-hop)
         Enumeration<String> headerNames = Collections.enumeration(List.of("Content-Type", "Connection"));
         when(mockRequest.getHeaderNames()).thenReturn(headerNames);
         when(mockRequest.getHeaders("Content-Type")).thenReturn(Collections.enumeration(List.of("application/json")));
 
-
-        // Mock outgoing HTTP Response
         when(mockHttpResponse.statusCode()).thenReturn(201);
         InputStream responseStream = new ByteArrayInputStream("response-body".getBytes());
         when(mockHttpResponse.body()).thenReturn(responseStream);
@@ -96,32 +111,26 @@ class RequestProxyTest {
         );
         when(mockHttpResponse.headers()).thenReturn(responseHeaders);
 
-        // Mocking the generic method send correctly
-        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<InputStream>>any());
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
-        // Mock Servlet Response Output Stream
         when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
 
-        // Execute
-        requestProxy.proxyRequest(mockRequest, mockResponse, targetUri, properties);
+        // Execute with the new resilienceProperties parameter
+        requestProxy.proxyRequest(mockRequest, mockResponse, targetUri, properties, resilienceProperties);
 
-        // Verify HttpClient got the right built request
-        verify(mockHttpClient).send(httpRequestCaptor.capture(), any());
+        verify(mockHttpClient).sendAsync(httpRequestCaptor.capture(), any());
         HttpRequest sentRequest = httpRequestCaptor.getValue();
 
         assertEquals("POST", sentRequest.method());
         assertEquals(new URI("http://backend-service:8080/api/test?param=value"), sentRequest.uri());
         assertTrue(sentRequest.headers().map().containsKey("Content-Type"));
-        // Hop-by-hop should not be copied
         assertTrue(sentRequest.headers().map().keySet().stream().noneMatch(k -> k.equalsIgnoreCase("Connection")));
 
-        // Verify Servlet Response was populated correctly
         verify(mockResponse).setStatus(201);
         verify(mockResponse).addHeader("Custom-Header", "custom-value");
-        // Hop-by-hop response header should not be copied
         verify(mockResponse, never()).addHeader(eq("Keep-Alive"), anyString());
         
-        // With transferTo, it writes in chunks. Verify at least one write occurred.
         verify(mockOutputStream, atLeastOnce()).write(any(byte[].class), anyInt(), anyInt());
     }
 
@@ -140,15 +149,14 @@ class RequestProxyTest {
         when(mockHttpResponse.body()).thenReturn(responseStream);
         when(mockHttpResponse.headers()).thenReturn(HttpHeaders.of(Map.of(), (k, v) -> true));
         
-        // Mocking the generic method send correctly
-        doReturn(mockHttpResponse).when(mockHttpClient).send(any(HttpRequest.class), ArgumentMatchers.<HttpResponse.BodyHandler<InputStream>>any());
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
-        // Use lenient here because the response body is empty (length 0), so it might not write to the output stream
         lenient().when(mockResponse.getOutputStream()).thenReturn(mockOutputStream);
 
-        requestProxy.proxyRequest(mockRequest, mockResponse, targetUri, properties);
+        requestProxy.proxyRequest(mockRequest, mockResponse, targetUri, properties, resilienceProperties);
 
-        verify(mockHttpClient).send(httpRequestCaptor.capture(), any());
+        verify(mockHttpClient).sendAsync(httpRequestCaptor.capture(), any());
         HttpRequest sentRequest = httpRequestCaptor.getValue();
 
         assertTrue(sentRequest.timeout().isPresent());

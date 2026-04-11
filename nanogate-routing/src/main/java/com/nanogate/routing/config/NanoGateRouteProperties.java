@@ -1,6 +1,8 @@
 package com.nanogate.routing.config;
 
+import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.model.BackendSet;
+import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
 import jakarta.annotation.PostConstruct;
@@ -29,6 +31,8 @@ public class NanoGateRouteProperties {
 
     private boolean enabled = true;
     private HttpClientProperties defaultHttpClient;
+    private ResilienceProperties defaultResilience;
+    private HealthCheckProperties defaultHealthCheck;
     private List<Route> routes = new ArrayList<>();
     private List<BackendSet> backendSets = new ArrayList<>();
 
@@ -57,8 +61,8 @@ public class NanoGateRouteProperties {
             
             // Log warnings for unmonitored backend sets
             for (BackendSet backendSet : backendSets) {
-                if (backendSet.getHealthCheck() == null) {
-                    log.warn("BackendSet '{}' does not have a health-check configured. Servers in this set will be assumed healthy and will not be actively monitored.", backendSet.getName());
+                if (backendSet.getHealthCheck() == null && defaultHealthCheck == null) {
+                    log.warn("BackendSet '{}' does not have a health-check configured and no default is available. Servers in this set will be assumed healthy and will not be actively monitored.", backendSet.getName());
                 }
             }
         }
@@ -92,6 +96,22 @@ public class NanoGateRouteProperties {
 
     public void setDefaultHttpClient(HttpClientProperties defaultHttpClient) {
         this.defaultHttpClient = defaultHttpClient;
+    }
+
+    public ResilienceProperties getDefaultResilience() {
+        return defaultResilience;
+    }
+
+    public void setDefaultResilience(ResilienceProperties defaultResilience) {
+        this.defaultResilience = defaultResilience;
+    }
+
+    public HealthCheckProperties getDefaultHealthCheck() {
+        return defaultHealthCheck;
+    }
+
+    public void setDefaultHealthCheck(HealthCheckProperties defaultHealthCheck) {
+        this.defaultHealthCheck = defaultHealthCheck;
     }
 
     public List<Route> getRoutes() {

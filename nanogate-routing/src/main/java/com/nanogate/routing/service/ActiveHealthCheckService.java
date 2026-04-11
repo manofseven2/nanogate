@@ -14,6 +14,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,36 +28,56 @@ public class ActiveHealthCheckService implements HealthCheckService {
 
     private final NanoGateRouteProperties properties;
     private final ConcurrentHashMap<URI, AtomicBoolean> healthStatusMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Instant> lastCheckTimeMap = new ConcurrentHashMap<>();
     private final HttpClient healthCheckClient;
 
-    public ActiveHealthCheckService(NanoGateRouteProperties properties, 
+    // This CompletableFuture will be completed when all checks in the last runHealthChecks cycle are done.
+    private volatile CompletableFuture<Void> lastRunCompletion = CompletableFuture.completedFuture(null);
+
+    public ActiveHealthCheckService(NanoGateRouteProperties properties,
                                     @Qualifier("healthCheckHttpClient") HttpClient healthCheckClient) {
         this.properties = properties;
         this.healthCheckClient = healthCheckClient;
     }
 
-    @Scheduled(fixedDelayString = "${nanogate.routing.health-check.default-interval:10000}")
+    @Scheduled(fixedDelayString = "${nanogate.routing.health-check.ticker-interval:1000}") // Fast, global ticker
     public void runHealthChecks() {
         if (!properties.isEnabled()) {
             return;
         }
-        log.debug("Running active health checks for all configured backend sets...");
+        log.trace("Health check ticker running...");
+
+        Instant now = Instant.now();
+        List<CompletableFuture<Void>> currentChecks = new ArrayList<>();
 
         for (BackendSet backendSet : properties.getBackendSets()) {
-            HealthCheckProperties healthCheckProps = backendSet.getHealthCheck();
+            HealthCheckProperties healthCheckProps = backendSet.getHealthCheck() != null
+                    ? backendSet.getHealthCheck()
+                    : properties.getDefaultHealthCheck();
+
             if (healthCheckProps != null && healthCheckProps.path() != null) {
-                for (URI serverUri : backendSet.getServers()) {
-                    checkServerHealth(serverUri, healthCheckProps);
+                
+                Instant lastCheck = lastCheckTimeMap.getOrDefault(backendSet.getName(), Instant.MIN);
+                Duration interval = healthCheckProps.interval() != null ? healthCheckProps.interval() : Duration.ofSeconds(10);
+
+                if (now.isAfter(lastCheck.plus(interval))) {
+                    log.debug("Health check interval for backend set '{}' has elapsed. Pinging servers.", backendSet.getName());
+                    lastCheckTimeMap.put(backendSet.getName(), now);
+                    for (URI serverUri : backendSet.getServers()) {
+                        currentChecks.add(checkServerHealth(serverUri, healthCheckProps));
+                    }
                 }
             }
         }
+        // Update the completion future for this run
+        this.lastRunCompletion = CompletableFuture.allOf(currentChecks.toArray(new CompletableFuture[0]));
     }
 
     public CompletableFuture<Void> checkServerHealth(URI serverUri, HealthCheckProperties healthCheckProps) {
         log.debug("Pinging health check endpoint for server: {}", serverUri);
         try {
             URI healthCheckUri = new URI(serverUri.getScheme(), null, serverUri.getHost(), serverUri.getPort(), healthCheckProps.path(), null, null);
-            
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(healthCheckUri)
                     .timeout(healthCheckProps.timeout() != null ? healthCheckProps.timeout() : Duration.ofSeconds(5))
@@ -94,10 +117,15 @@ public class ActiveHealthCheckService implements HealthCheckService {
         }
     }
 
-    private void markAsUnhealthy(URI serverUri) {
+    @Override
+    public void markAsUnhealthy(URI serverUri) {
         AtomicBoolean previousStatus = healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(true));
         if (previousStatus.getAndSet(false)) {
             log.warn("Backend server {} is now marked as DOWN", serverUri);
         }
+    }
+
+    public CompletableFuture<Void> getLastRunCompletion() {
+        return lastRunCompletion;
     }
 }

@@ -3,6 +3,9 @@ package com.nanogate.routing.filter;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.nanogate.routing.NanoGateRoutingTestApp;
+import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.model.BackendSet;
+import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.service.ActiveHealthCheckService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -24,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = NanoGateRoutingTestApp.class)
 @ActiveProfiles("it") // Loads application-it.yml
@@ -34,6 +38,9 @@ class RoutingFilterIT {
 
     @Autowired
     private ActiveHealthCheckService healthCheckService;
+
+    @Autowired
+    private NanoGateRouteProperties routeProperties;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))
@@ -109,7 +116,6 @@ class RoutingFilterIT {
         String requestBody = "{\"data\": \"test post request\"}";
         String responseBody = "{\"status\": \"created successfully\"}";
 
-        // Stub a POST request that requires a specific body
         backend1.stubFor(post(urlEqualTo("/api/exact"))
                 .withRequestBody(equalToJson(requestBody))
                 .willReturn(aResponse()
@@ -117,7 +123,6 @@ class RoutingFilterIT {
                         .withHeader("Content-Type", "application/json")
                         .withBody(responseBody)));
 
-        // Send the POST request to NanoGate
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(getBaseUrl() + "/api/exact"))
                 .header("Content-Type", "application/json")
@@ -126,24 +131,20 @@ class RoutingFilterIT {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // Verify NanoGate successfully proxied the body and returned the correct response
         assertEquals(201, response.statusCode());
         assertEquals(responseBody, response.body());
         
-        // Verify wiremock actually received the exact POST request with body
         backend1.verify(1, postRequestedFor(urlEqualTo("/api/exact"))
                 .withRequestBody(equalToJson(requestBody)));
     }
 
     @Test
     void testLoadBalancedRoute_RoundRobin() throws Exception {
-        // Stub the same path on both backend servers in the backend-set
         backend2.stubFor(get(urlPathMatching("/api/lb/.*"))
                 .willReturn(aResponse().withStatus(200).withBody("backend-2")));
         backend3.stubFor(get(urlPathMatching("/api/lb/.*"))
                 .willReturn(aResponse().withStatus(200).withBody("backend-3")));
 
-        // Send 4 requests
         int backend2Count = 0;
         int backend3Count = 0;
 
@@ -159,14 +160,12 @@ class RoutingFilterIT {
             if ("backend-3".equals(response.body())) backend3Count++;
         }
 
-        // Verify Round Robin distributed them evenly (2 to each)
         assertEquals(2, backend2Count);
         assertEquals(2, backend3Count);
     }
 
     @Test
     void testSlowRoute_TimeoutOverride() throws Exception {
-        // This backend takes 500ms to respond, but the route has a 100ms timeout override
         slowBackend.stubFor(get(urlEqualTo("/api/slow"))
                 .willReturn(aResponse()
                         .withFixedDelay(500)
@@ -179,7 +178,6 @@ class RoutingFilterIT {
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // Expecting a Bad Gateway or Gateway Timeout because the client aborted early
         assertTrue(response.statusCode() >= 500);
     }
 
@@ -212,26 +210,23 @@ class RoutingFilterIT {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         assertEquals(200, response.statusCode());
-        assertTrue(response.headers().map().containsKey("X-Custom-Resp".toLowerCase())); // Java HttpClient headers are lowercase
-        assertEquals("resp-val", response.headers().firstValue("X-Custom-Resp").orElse(""));
+        assertTrue(response.headers().map().containsKey("x-custom-resp"));
+        assertEquals("resp-val", response.headers().firstValue("x-custom-resp").orElse(""));
     }
 
     @Test
     void testLeastConnectionsLoadBalancer() throws Exception {
-        // We configure leastConnBackend1 to be very slow, simulating high load
         leastConnBackend1.stubFor(get(urlEqualTo("/api/lc/item"))
                 .willReturn(aResponse()
                         .withFixedDelay(1000)
                         .withStatus(200)
                         .withBody("slow-backend-1")));
 
-        // We configure leastConnBackend2 to be very fast
         leastConnBackend2.stubFor(get(urlEqualTo("/api/lc/item"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withBody("fast-backend-2")));
 
-        // Fire off multiple requests concurrently
         List<CompletableFuture<HttpResponse<String>>> futures = new ArrayList<>();
         
         for (int i = 0; i < 5; i++) {
@@ -241,11 +236,9 @@ class RoutingFilterIT {
                     .build();
             futures.add(httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()));
             
-            // tiny delay to ensure the first request hits the slow backend and stays open
             Thread.sleep(50);
         }
 
-        // Wait for all to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
         int backend1Count = 0;
@@ -258,9 +251,6 @@ class RoutingFilterIT {
             if ("fast-backend-2".equals(response.body())) backend2Count++;
         }
 
-        // With Least Connections, the slow backend should only receive 1 request (the first one).
-        // While it is busy (sleeping for 1000ms), its active connection count is 1.
-        // The fast backend will process all subsequent requests because its active connection count drops back to 0 instantly.
         assertTrue(backend2Count > backend1Count);
         assertEquals(1, backend1Count, "Slow backend should only handle 1 request");
         assertEquals(4, backend2Count, "Fast backend should handle the rest");
@@ -268,26 +258,33 @@ class RoutingFilterIT {
 
     @Test
     void testHealthCheck_ExcludesUnhealthyServerFromLoadBalancing() throws Exception {
-        // Initially, both servers are healthy
+        final URI unhealthyUri = new URI("http://localhost:8088");
+        final URI healthyUri = new URI("http://localhost:8089");
+        
+        BackendSet backendSet = routeProperties.getBackendSet("health-check-backend");
+        HealthCheckProperties healthProps = backendSet.getHealthCheck();
+
+        // 1. Start with both servers being healthy
         healthCheckBackend1.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(200)));
         healthCheckBackend2.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(200)));
 
-        // Stub the actual API endpoint
-        healthCheckBackend1.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-1")));
-        healthCheckBackend2.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-2")));
+        // 2. Manually run checks and wait for them to complete synchronously
+        healthCheckService.checkServerHealth(unhealthyUri, healthProps).join();
+        healthCheckService.checkServerHealth(healthyUri, healthProps).join();
+        assertTrue(healthCheckService.isHealthy(unhealthyUri), "Server should be healthy initially");
 
-        // Manually trigger health check to establish baseline
-        healthCheckService.runHealthChecks();
-        Thread.sleep(200); // Allow async checks to complete
-
-        // Now, make one server unhealthy
+        // 3. Now, make one server consistently fail its health check
         healthCheckBackend1.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(503)));
 
-        // Trigger health check again to detect the failure
-        healthCheckService.runHealthChecks();
-        Thread.sleep(200); // Allow async checks to complete
+        // 4. Manually run the check again and wait for it to complete
+        healthCheckService.checkServerHealth(unhealthyUri, healthProps).join();
+        assertFalse(healthCheckService.isHealthy(unhealthyUri), "Server should now be unhealthy");
 
-        // Send multiple requests. All should go to the healthy backend (backend-2).
+        // 5. Stub the actual API endpoints
+        healthCheckBackend1.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-1-unhealthy")));
+        healthCheckBackend2.stubFor(get(urlEqualTo("/api/health-test/data")).willReturn(aResponse().withBody("backend-2-healthy")));
+
+        // 6. Send multiple requests. All should go to the healthy backend (backend-2).
         int backend1Count = 0;
         int backend2Count = 0;
         for (int i = 0; i < 4; i++) {
@@ -298,8 +295,8 @@ class RoutingFilterIT {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             assertEquals(200, response.statusCode());
-            if ("backend-1".equals(response.body())) backend1Count++;
-            if ("backend-2".equals(response.body())) backend2Count++;
+            if ("backend-1-unhealthy".equals(response.body())) backend1Count++;
+            if ("backend-2-healthy".equals(response.body())) backend2Count++;
         }
 
         assertEquals(0, backend1Count, "Unhealthy server should receive no traffic");

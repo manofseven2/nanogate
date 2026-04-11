@@ -15,6 +15,23 @@
     <description>Core routing, load balancing, and health checking module for a virtual-thread model</description>
 
     <dependencies>
+        <!-- Internal Modules -->
+        <dependency>
+            <groupId>com.nanogate</groupId>
+            <artifactId>nanogate-resilience</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Resilience4j for Circuit Breaker -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+        </dependency>
+
         <!--
             Spring Web with embedded Tomcat.
             When virtual threads are enabled, this will handle each request in a virtual thread.

@@ -94,4 +94,16 @@ class ActiveHealthCheckServiceTest {
         // Then
         assertFalse(healthCheckService.isHealthy(server1));
     }
+
+    @Test
+    void testMarkAsUnhealthy_ChangesStateFromUpToDown() {
+        // Initially, the server is healthy by default
+        assertTrue(healthCheckService.isHealthy(server1));
+
+        // When we manually mark it as unhealthy
+        healthCheckService.markAsUnhealthy(server1);
+
+        // Then, it should be considered unhealthy
+        assertFalse(healthCheckService.isHealthy(server1));
+    }
 }

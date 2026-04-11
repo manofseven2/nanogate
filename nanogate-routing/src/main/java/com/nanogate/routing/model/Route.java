@@ -1,5 +1,7 @@
 package com.nanogate.routing.model;
 
+import com.nanogate.resilience.model.ResilienceProperties;
+
 /**
  * Represents a routing rule that maps a path to a named BackendSet.
  * It can optionally override policies defined in the BackendSet, such as the load balancer
@@ -11,6 +13,7 @@ public class Route {
     private String backendSet; // Reverted to String
     private String loadBalancer; // Optional override
     private HttpClientProperties httpClient; // Optional override
+    private ResilienceProperties resilience; // Optional override
 
     public String getId() {
         return id;
@@ -50,5 +53,13 @@ public class Route {
 
     public void setHttpClient(HttpClientProperties httpClient) {
         this.httpClient = httpClient;
+    }
+
+    public ResilienceProperties getResilience() {
+        return resilience;
+    }
+
+    public void setResilience(ResilienceProperties resilience) {
+        this.resilience = resilience;
     }
 }

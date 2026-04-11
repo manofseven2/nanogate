@@ -1,5 +1,7 @@
 package com.nanogate.routing.model;
 
+import com.nanogate.resilience.model.ResilienceProperties;
+
 import java.net.URI;
 import java.util.List;
 
@@ -13,6 +15,7 @@ public class BackendSet {
     private List<URI> servers;
     private HttpClientProperties httpClient;
     private HealthCheckProperties healthCheck;
+    private ResilienceProperties resilience;
 
     public String getName() {
         return name;
@@ -52,5 +55,13 @@ public class BackendSet {
 
     public void setHealthCheck(HealthCheckProperties healthCheck) {
         this.healthCheck = healthCheck;
+    }
+
+    public ResilienceProperties getResilience() {
+        return resilience;
+    }
+
+    public void setResilience(ResilienceProperties resilience) {
+        this.resilience = resilience;
     }
 }

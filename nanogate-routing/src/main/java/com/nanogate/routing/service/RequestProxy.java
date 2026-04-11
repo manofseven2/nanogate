@@ -1,6 +1,9 @@
 package com.nanogate.routing.service;
 
+import com.nanogate.resilience.model.ResilienceProperties;
+import com.nanogate.resilience.service.CircuitBreakerProvider;
 import com.nanogate.routing.model.HttpClientProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Enumeration;
+import java.util.concurrent.CompletionException;
 
 /**
  * Service responsible for proxying the incoming HttpServletRequest to a target URI.
@@ -21,9 +25,11 @@ import java.util.Enumeration;
 public class RequestProxy {
 
     private final HttpClientProvider httpClientProvider;
+    private final CircuitBreakerProvider circuitBreakerProvider;
 
-    public RequestProxy(HttpClientProvider httpClientProvider) {
+    public RequestProxy(HttpClientProvider httpClientProvider, CircuitBreakerProvider circuitBreakerProvider) {
         this.httpClientProvider = httpClientProvider;
+        this.circuitBreakerProvider = circuitBreakerProvider;
     }
 
     /**
@@ -33,19 +39,17 @@ public class RequestProxy {
      * @param response The original HttpServletResponse.
      * @param targetUri The URI of the backend service to forward the request to.
      * @param clientProperties The resolved HTTP client properties for this request.
+     * @param resilienceProperties The resolved resilience properties for this request.
      * @throws IOException If an I/O error occurs during proxying.
      * @throws InterruptedException If the operation is interrupted.
      */
-    public void proxyRequest(HttpServletRequest request, HttpServletResponse response, URI targetUri, HttpClientProperties clientProperties)
+    public void proxyRequest(HttpServletRequest request, HttpServletResponse response, URI targetUri,
+                             HttpClientProperties clientProperties, ResilienceProperties resilienceProperties)
             throws IOException, InterruptedException {
 
-        // Get a cached HttpClient instance for this request's configuration
         HttpClient httpClient = httpClientProvider.getClient(clientProperties);
-
-        // 1. Build the HttpRequest for the backend
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
 
-        // Copy method
         requestBuilder.method(request.getMethod(), HttpRequest.BodyPublishers.ofInputStream(() -> {
             try {
                 return request.getInputStream();
@@ -54,18 +58,15 @@ public class RequestProxy {
             }
         }));
 
-        // Construct the new target URI, preserving query parameters
         String queryString = request.getQueryString();
         String finalPath = targetUri.getPath() + request.getRequestURI().substring(request.getContextPath().length());
         URI finalTargetUri = URI.create(targetUri.getScheme() + "://" + targetUri.getAuthority() + finalPath + (queryString != null ? "?" + queryString : ""));
         requestBuilder.uri(finalTargetUri);
 
-        // Apply response timeout if specified
         if (clientProperties.getResponseTimeout() != null) {
             requestBuilder.timeout(clientProperties.getResponseTimeout());
         }
 
-        // Copy headers (excluding hop-by-hop headers and Host header)
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
@@ -77,32 +78,37 @@ public class RequestProxy {
             }
         }
 
-        // 2. Send the request and expect an InputStream for the body (Streaming)
-        HttpResponse<InputStream> backendResponse = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream());
+        CircuitBreaker circuitBreaker = circuitBreakerProvider.getCircuitBreaker(targetUri, resilienceProperties);
+        HttpRequest httpRequest = requestBuilder.build();
 
-        // 3. Copy backend response headers to original HttpServletResponse FIRST
-        response.setStatus(backendResponse.statusCode());
+        try {
+            HttpResponse<InputStream> backendResponse = circuitBreaker.executeCompletionStage(
+                    () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
+            ).toCompletableFuture().join();
 
-        backendResponse.headers().map().forEach((name, values) -> {
-            if (!isHopByHopHeader(name) && !name.equalsIgnoreCase("content-length") && !name.equalsIgnoreCase("transfer-encoding")) {
-                values.forEach(value -> response.addHeader(name, value));
+            response.setStatus(backendResponse.statusCode());
+
+            backendResponse.headers().map().forEach((name, values) -> {
+                if (!isHopByHopHeader(name) && !name.equalsIgnoreCase("content-length") && !name.equalsIgnoreCase("transfer-encoding")) {
+                    values.forEach(value -> response.addHeader(name, value));
+                }
+            });
+
+            try (InputStream bodyStream = backendResponse.body()) {
+                if (bodyStream != null) {
+                    bodyStream.transferTo(response.getOutputStream());
+                    response.getOutputStream().flush();
+                }
             }
-        });
-
-        // 4. Stream the body to the client
-        // Using transferTo() which inherently uses an 8192-byte buffer under the hood in the JDK.
-        // This blocks the Virtual Thread if the client is slow, naturally propagating TCP backpressure
-        // to the backend without causing OutOfMemoryErrors on the gateway.
-        try (InputStream bodyStream = backendResponse.body()) {
-            if (bodyStream != null) {
-                bodyStream.transferTo(response.getOutputStream());
-                // Flush the output stream at the end to ensure all remaining bytes are sent
-                response.getOutputStream().flush();
+        } catch (CompletionException e) {
+            // Unwrap the CompletionException to throw the original cause
+            if (e.getCause() instanceof IOException) {
+                throw (IOException) e.getCause();
+            } else if (e.getCause() instanceof InterruptedException) {
+                throw (InterruptedException) e.getCause();
+            } else {
+                throw new RuntimeException(e.getCause());
             }
-        } catch (IOException e) {
-            // Client likely disconnected or pipe broke during streaming.
-            // Virtual thread terminates cleanly.
-            throw new IOException("Error while streaming response to client", e);
         }
     }
 

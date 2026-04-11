@@ -22,6 +22,12 @@ nanogate:
           path: /health
           interval: 10s
           timeout: 2s
+        resilience:
+          # More aggressive settings for development and testing
+          failureRateThreshold: 50.0
+          slidingWindowSize: 10
+          minimumNumberOfCalls: 5
+          waitDurationInOpenState: 10s
 
       - name: order-service-backend
         load-balancer: ROUND_ROBIN

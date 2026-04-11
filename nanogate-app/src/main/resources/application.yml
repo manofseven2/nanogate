@@ -34,7 +34,19 @@ nanogate:
   routing:
     enabled: true
     # Global Default HTTP Client Configuration
-    # This provides a fallback for any backend that doesn't have specific settings.
     default-http-client:
       connectTimeout: 5s
       responseTimeout: 15s
+    # Global Default Resilience (Circuit Breaker) Configuration
+    default-resilience:
+      failureRateThreshold: 50.0
+      slowCallRateThreshold: 100.0
+      slowCallDurationThreshold: 10s
+      permittedNumberOfCallsInHalfOpenState: 10
+      slidingWindowSize: 100
+      waitDurationInOpenState: 30s
+    # Global Default Health Check Configuration
+    default-health-check:
+      path: /health
+      interval: 10s
+      timeout: 2s

@@ -51,3 +51,24 @@ An HTTP request body (`InputStream`) can generally only be read once. To mirror 
 **B. Service Meshes (Envoy / Istio)**
 *   Envoy and Istio are the current industry standard for traffic mirroring, running as C++ "sidecars".
 *   **NanoGate's Strength (Developer Experience):** Configuring Istio for shadow routing requires deep knowledge of complex Kubernetes CRDs and Envoy YAML. Furthermore, if a platform team wants custom mirroring logic (e.g., "Only mirror traffic if the user's ID ends in 5"), doing so in Envoy requires writing custom WebAssembly (Wasm) plugins or complex Lua scripts. NanoGate is a standard Java Spring Boot application; developers can add that custom logic with five lines of standard Java code, making it infinitely more maintainable for Java/C# centric teams.
+
+---
+
+## 2. Endpoint-Specific Circuit Breakers
+
+### Context
+Currently, our circuit breakers operate at the **server level**. If an endpoint like `POST /api/users/search` on `server1` starts failing, the circuit breaker for the entire `server1` URI will open. This is a simple and robust default, as it quarantines the potentially sick server instance.
+
+However, this means that a request to a perfectly healthy endpoint on the same server, like `GET /api/users/123`, would also be blocked until the circuit closes.
+
+### Advanced Approach (Service-Mesh Style)
+For maximum availability, especially in a monolith or a service with many diverse endpoints, we could implement endpoint-specific circuit breaking.
+
+*   **Mechanism:** Instead of keying the circuit breaker on the server's `URI` alone, we would use a composite key, such as `URI + RouteID` or `URI + HTTP_METHOD + URL_PATH_PATTERN`.
+*   **Behavior:** A failure on `POST /api/users/search` would only open the circuit for that specific endpoint on that specific server. Requests to `GET /api/users/123` would continue to flow, even to the same server instance.
+*   **Trade-offs:**
+    *   **Pro:** Maximizes availability.
+    *   **Con:** Significantly increases memory consumption, as the gateway would need to maintain a separate circuit breaker state for every single route/endpoint on every single server instance.
+    *   **Con:** Adds complexity to configuration and monitoring.
+
+This is a powerful feature common in advanced service meshes like Istio and could be considered for a future "enterprise-grade" version of NanoGate.

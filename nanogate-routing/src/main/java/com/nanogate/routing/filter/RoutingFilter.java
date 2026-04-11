@@ -1,13 +1,12 @@
 package com.nanogate.routing.filter;
 
+import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
-import com.nanogate.routing.service.ActiveConnectionTracker;
-import com.nanogate.routing.service.LoadBalancerFactory;
-import com.nanogate.routing.service.RouteLocator;
-import com.nanogate.routing.service.RequestProxy;
+import com.nanogate.routing.service.*;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -41,20 +40,23 @@ public class RoutingFilter implements Filter {
     private final LoadBalancerFactory loadBalancerFactory;
     private final RequestProxy requestProxy;
     private final ActiveConnectionTracker connectionTracker;
+    private final HealthCheckService healthCheckService;
 
     @Value("${management.endpoints.web.base-path:/actuator}")
     private String actuatorBasePath;
 
-    public RoutingFilter(NanoGateRouteProperties properties, 
-                         RouteLocator routeLocator, 
-                         LoadBalancerFactory loadBalancerFactory, 
+    public RoutingFilter(NanoGateRouteProperties properties,
+                         RouteLocator routeLocator,
+                         LoadBalancerFactory loadBalancerFactory,
                          RequestProxy requestProxy,
-                         ActiveConnectionTracker connectionTracker) {
+                         ActiveConnectionTracker connectionTracker,
+                         HealthCheckService healthCheckService) {
         this.properties = properties;
         this.routeLocator = routeLocator;
         this.loadBalancerFactory = loadBalancerFactory;
         this.requestProxy = requestProxy;
         this.connectionTracker = connectionTracker;
+        this.healthCheckService = healthCheckService;
     }
 
     @Override
@@ -64,7 +66,6 @@ public class RoutingFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         HttpServletResponse response = (HttpServletResponse) servletResponse;
 
-        // Explicitly allow actuator endpoints to pass through without being routed.
         if (request.getRequestURI().startsWith(actuatorBasePath)) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
@@ -73,7 +74,6 @@ public class RoutingFilter implements Filter {
         Optional<Route> optionalRoute = routeLocator.findRoute(request);
 
         if (optionalRoute.isEmpty()) {
-            // If it's not an actuator path and no route matches, send our own generic 404.
             log.warn("No route matched for request: {} {}", request.getMethod(), request.getRequestURI());
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
             return;
@@ -88,15 +88,13 @@ public class RoutingFilter implements Filter {
             return;
         }
 
-        // 1. Determine the final HttpClient properties using the hierarchy
         HttpClientProperties clientProperties = resolveHttpClientProperties(route, backendSet);
+        ResilienceProperties resilienceProperties = resolveResilienceProperties(route, backendSet);
 
-        // 2. Determine the load balancer strategy
         String strategyName = StringUtils.hasText(route.getLoadBalancer())
                 ? route.getLoadBalancer()
                 : backendSet.getLoadBalancer();
 
-        // 3. Choose a backend server
         Optional<URI> optionalTargetUri = loadBalancerFactory.getLoadBalancer(strategyName)
                 .flatMap(lb -> lb.chooseBackend(backendSet));
 
@@ -106,24 +104,39 @@ public class RoutingFilter implements Filter {
             return;
         }
 
-        // 4. Proxy the request and track connections
         URI targetUri = optionalTargetUri.get();
-        log.info("Proxying request for route '{}' to backend: {}", route.getId(), targetUri);
+        proxyWithRetry(request, response, targetUri, clientProperties, resilienceProperties, backendSet, strategyName);
+    }
 
-        // Notify the tracker that a new connection is starting
-        connectionTracker.increment(targetUri);
+    private void proxyWithRetry(HttpServletRequest request, HttpServletResponse response, URI targetUri,
+                                HttpClientProperties clientProperties, ResilienceProperties resilienceProperties,
+                                BackendSet backendSet, String strategyName) throws IOException {
         
+        connectionTracker.increment(targetUri);
         try {
-            requestProxy.proxyRequest(request, response, targetUri, clientProperties);
+            requestProxy.proxyRequest(request, response, targetUri, clientProperties, resilienceProperties);
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit for {} is open. Marking as unhealthy and attempting to find another backend.", targetUri);
+            healthCheckService.markAsUnhealthy(targetUri);
+
+            // Retry logic
+            Optional<URI> nextTargetUri = loadBalancerFactory.getLoadBalancer(strategyName)
+                    .flatMap(lb -> lb.chooseBackend(backendSet));
+
+            if (nextTargetUri.isPresent()) {
+                proxyWithRetry(request, response, nextTargetUri.get(), clientProperties, resilienceProperties, backendSet, strategyName);
+            } else {
+                log.error("All backends for set '{}' are unavailable after circuit break.", backendSet.getName());
+                response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "All backend instances are currently unavailable.");
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("Request proxying interrupted for route '{}' to {}: {}", route.getId(), targetUri, e.getMessage());
+            log.error("Request proxying interrupted for backend {}: {}", targetUri, e.getMessage());
             response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Gateway interrupted while proxying request.");
         } catch (Exception e) {
-            log.error("Error proxying request for route '{}' to {}: {}", route.getId(), targetUri, e.getMessage());
+            log.error("Error proxying request to backend {}: {}", targetUri, e.getMessage());
             response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Error proxying request to backend.");
         } finally {
-            // Guaranteed to decrement, even if the proxy request fails, times out, or the client disconnects early.
             connectionTracker.decrement(targetUri);
         }
     }
@@ -132,11 +145,13 @@ public class RoutingFilter implements Filter {
         HttpClientProperties globalProps = properties.getDefaultHttpClient() != null
                 ? properties.getDefaultHttpClient()
                 : new HttpClientProperties();
+        return globalProps.merge(backendSet.getHttpClient()).merge(route.getHttpClient());
+    }
 
-        HttpClientProperties backendProps = backendSet.getHttpClient();
-        HttpClientProperties routeProps = route.getHttpClient();
-
-        // Merge properties: Global -> BackendSet -> Route
-        return globalProps.merge(backendProps).merge(routeProps);
+    private ResilienceProperties resolveResilienceProperties(Route route, BackendSet backendSet) {
+        ResilienceProperties globalProps = properties.getDefaultResilience() != null
+                ? properties.getDefaultResilience()
+                : new ResilienceProperties(null, null, null, null, null, null);
+        return globalProps.merge(backendSet.getResilience()).merge(route.getResilience());
     }
 }

@@ -7,6 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * This allows @SpringBootTest to start up an isolated context focusing only on routing beans,
  * without needing the full nanogate-app module.
  */
-@SpringBootApplication(scanBasePackages = "com.nanogate.routing")
+@SpringBootApplication(scanBasePackages = "com.nanogate")
 public class NanoGateRoutingTestApp {
 }

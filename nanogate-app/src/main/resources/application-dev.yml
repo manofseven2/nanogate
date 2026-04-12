@@ -42,9 +42,15 @@ nanogate:
         http-client:
           responseTimeout: 60s # Specific override for this slow route
 
-      - id: user-profile-route
+      - id: rewrite-route
         path: /api/users/**
         backend-set: user-service-backend
+        stripPrefix: 1
+        rewritePath: "/users/(?<id>.*)"
+        rewriteReplacement: "/user/fetch?id=${id}"
+        requestHeaders:
+          add:
+            X-Downstream-Trace-Id: "nanogate-{header.X-Request-Id}"
 
       - id: order-service-route
         path: /api/orders/**

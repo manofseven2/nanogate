@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,19 +19,20 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-/**
- * Service responsible for proxying the incoming HttpServletRequest to a target URI.
- * It uses a provided HttpClient instance to perform the request forwarding.
- */
 @Service
 public class RequestProxy {
 
     private static final Logger log = LoggerFactory.getLogger(RequestProxy.class);
+    private static final Pattern HEADER_PLACEHOLDER_PATTERN = Pattern.compile("\\{header\\.([^}]+)}");
 
     private final HttpClientProvider httpClientProvider;
     private final CircuitBreakerProvider circuitBreakerProvider;
@@ -67,8 +69,9 @@ public class RequestProxy {
             }
         }));
 
+        String transformedPath = transformPath(request.getRequestURI().substring(request.getContextPath().length()), route);
+        String finalPath = targetUri.getPath() + transformedPath;
         String queryString = request.getQueryString();
-        String finalPath = targetUri.getPath() + request.getRequestURI().substring(request.getContextPath().length());
         URI finalTargetUri = URI.create(targetUri.getScheme() + "://" + targetUri.getAuthority() + finalPath + (queryString != null ? "?" + queryString : ""));
         requestBuilder.uri(finalTargetUri);
 
@@ -76,7 +79,6 @@ public class RequestProxy {
             requestBuilder.timeout(clientProperties.getResponseTimeout());
         }
 
-        // Apply request header transformations
         applyRequestHeaderTransforms(request, requestBuilder, route.getRequestHeaders());
 
         CircuitBreaker circuitBreaker = circuitBreakerProvider.getCircuitBreaker(targetUri, resilienceProperties);
@@ -87,7 +89,6 @@ public class RequestProxy {
                     () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
             ).toCompletableFuture().join();
 
-            // Apply response header transformations before sending to client
             applyResponseHeaderTransforms(response, backendResponse, route.getResponseHeaders());
 
             try (InputStream bodyStream = backendResponse.body()) {
@@ -97,14 +98,31 @@ public class RequestProxy {
                 }
             }
         } catch (CompletionException e) {
-            if (e.getCause() instanceof IOException) {
-                throw (IOException) e.getCause();
-            } else if (e.getCause() instanceof InterruptedException) {
-                throw (InterruptedException) e.getCause();
-            } else {
-                throw new RuntimeException(e.getCause());
+            if (e.getCause() instanceof IOException) throw (IOException) e.getCause();
+            if (e.getCause() instanceof InterruptedException) throw (InterruptedException) e.getCause();
+            throw new RuntimeException(e.getCause());
+        }
+    }
+
+    private String transformPath(String path, Route route) {
+        String modifiedPath = path;
+
+        if (route.getStripPrefix() != null && route.getStripPrefix() > 0) {
+            String[] segments = path.split("/");
+            if (segments.length > route.getStripPrefix()) {
+                modifiedPath = "/" + Arrays.stream(segments, route.getStripPrefix() + 1, segments.length)
+                                          .collect(Collectors.joining("/"));
+                log.debug("Stripped prefix from path. Original: '{}', New: '{}'", path, modifiedPath);
             }
         }
+
+        if (StringUtils.hasText(route.getRewritePath()) && StringUtils.hasText(route.getRewriteReplacement())) {
+            String originalForLog = modifiedPath;
+            modifiedPath = modifiedPath.replaceAll(route.getRewritePath(), route.getRewriteReplacement());
+            log.debug("Rewrote path. Original: '{}', New: '{}'", originalForLog, modifiedPath);
+        }
+
+        return modifiedPath;
     }
 
     private void applyRequestHeaderTransforms(HttpServletRequest request, HttpRequest.Builder requestBuilder, HeaderTransformProperties transforms) {
@@ -129,15 +147,28 @@ public class RequestProxy {
 
         if (transforms != null && transforms.add() != null) {
             transforms.add().forEach((key, value) -> {
-                log.debug("Adding/overwriting request header: {}={}", key, value);
-                requestBuilder.setHeader(key, value);
+                String resolvedValue = resolveHeaderPlaceholder(value, request);
+                log.debug("Adding/overwriting request header: {}={}", key, resolvedValue);
+                requestBuilder.setHeader(key, resolvedValue);
             });
         }
     }
 
+    private String resolveHeaderPlaceholder(String value, HttpServletRequest request) {
+        if (value == null || !value.contains("{")) {
+            return value;
+        }
+        Matcher matcher = HEADER_PLACEHOLDER_PATTERN.matcher(value);
+        return matcher.replaceAll(matchResult -> {
+            String headerName = matchResult.group(1);
+            String headerValue = request.getHeader(headerName);
+            log.debug("Resolved placeholder '{{}}' to value '{}'", matchResult.group(0), headerValue);
+            return headerValue != null ? headerValue : "";
+        });
+    }
+
     private void applyResponseHeaderTransforms(HttpServletResponse response, HttpResponse<InputStream> backendResponse, HeaderTransformProperties transforms) {
         response.setStatus(backendResponse.statusCode());
-
         List<String> toRemove = (transforms != null && transforms.remove() != null)
                 ? transforms.remove().stream().map(String::toLowerCase).toList()
                 : Collections.emptyList();
@@ -162,13 +193,9 @@ public class RequestProxy {
 
     private boolean isHopByHopHeader(String headerName) {
         String lowerCaseHeaderName = headerName.toLowerCase();
-        return lowerCaseHeaderName.equals("connection") ||
-               lowerCaseHeaderName.equals("keep-alive") ||
-               lowerCaseHeaderName.equals("proxy-authenticate") ||
-               lowerCaseHeaderName.equals("proxy-authorization") ||
-               lowerCaseHeaderName.equals("te") ||
-               lowerCaseHeaderName.equals("trailers") ||
-               lowerCaseHeaderName.equals("transfer-encoding") ||
-               lowerCaseHeaderName.equals("upgrade");
+        return lowerCaseHeaderName.equals("connection") || "keep-alive".equals(lowerCaseHeaderName) ||
+               "proxy-authenticate".equals(lowerCaseHeaderName) || "proxy-authorization".equals(lowerCaseHeaderName) ||
+               "te".equals(lowerCaseHeaderName) || "trailers".equals(lowerCaseHeaderName) ||
+               "transfer-encoding".equals(lowerCaseHeaderName) || "upgrade".equals(lowerCaseHeaderName);
     }
 }

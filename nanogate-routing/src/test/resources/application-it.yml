@@ -51,7 +51,7 @@ nanogate:
         backend-set: health-check-backend
       - id: header-transform-route
         path: "/api/headers/**"
-        backend-set: test-backend-1 # Reuse an existing backend for this test
+        backend-set: test-backend-1
         requestHeaders:
           add:
             X-Gateway-Source: "NanoGate"
@@ -62,3 +62,12 @@ nanogate:
             X-Content-Source: "Backend"
           remove:
             - "X-Powered-By"
+      - id: rewrite-route
+        path: /api/users/**
+        backend-set: test-backend-1
+        stripPrefix: 1
+        rewritePath: "/users/(?<id>.*)"
+        rewriteReplacement: "/user/fetch?id=${id}"
+        requestHeaders:
+          add:
+            X-Downstream-Trace-Id: "nanogate-{header.X-Request-Id}"

@@ -10,12 +10,15 @@ import com.nanogate.resilience.model.ResilienceProperties;
 public class Route {
     private String id;
     private String path;
-    private String backendSet; // Reverted to String
-    private String loadBalancer; // Optional override
-    private HttpClientProperties httpClient; // Optional override
-    private ResilienceProperties resilience; // Optional override
+    private String backendSet;
+    private String loadBalancer;
+    private HttpClientProperties httpClient;
+    private ResilienceProperties resilience;
     private HeaderTransformProperties requestHeaders;
     private HeaderTransformProperties responseHeaders;
+    private Integer stripPrefix;
+    private String rewritePath;
+    private String rewriteReplacement;
 
     public String getId() {
         return id;
@@ -79,5 +82,29 @@ public class Route {
 
     public void setResponseHeaders(HeaderTransformProperties responseHeaders) {
         this.responseHeaders = responseHeaders;
+    }
+
+    public Integer getStripPrefix() {
+        return stripPrefix;
+    }
+
+    public void setStripPrefix(Integer stripPrefix) {
+        this.stripPrefix = stripPrefix;
+    }
+
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
+    }
+
+    public String getRewriteReplacement() {
+        return rewriteReplacement;
+    }
+
+    public void setRewriteReplacement(String rewriteReplacement) {
+        this.rewriteReplacement = rewriteReplacement;
     }
 }

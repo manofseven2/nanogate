@@ -46,6 +46,27 @@
           "name": "John Doe"
         }
       }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/user/fetch",
+        "queryParameters": {
+          "id": {
+            "equalTo": "123"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "userId": "123",
+          "name": "Rewritten User"
+        }
+      }
     }
   ]
 }

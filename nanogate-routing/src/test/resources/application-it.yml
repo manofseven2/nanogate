@@ -49,3 +49,16 @@ nanogate:
       - id: health-check-route
         path: "/api/health-test/**"
         backend-set: health-check-backend
+      - id: header-transform-route
+        path: "/api/headers/**"
+        backend-set: test-backend-1 # Reuse an existing backend for this test
+        requestHeaders:
+          add:
+            X-Gateway-Source: "NanoGate"
+          remove:
+            - "X-Internal-Debug"
+        responseHeaders:
+          add:
+            X-Content-Source: "Backend"
+          remove:
+            - "X-Powered-By"

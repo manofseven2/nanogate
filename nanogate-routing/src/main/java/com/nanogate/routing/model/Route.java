@@ -14,6 +14,8 @@ public class Route {
     private String loadBalancer; // Optional override
     private HttpClientProperties httpClient; // Optional override
     private ResilienceProperties resilience; // Optional override
+    private HeaderTransformProperties requestHeaders;
+    private HeaderTransformProperties responseHeaders;
 
     public String getId() {
         return id;
@@ -61,5 +63,21 @@ public class Route {
 
     public void setResilience(ResilienceProperties resilience) {
         this.resilience = resilience;
+    }
+
+    public HeaderTransformProperties getRequestHeaders() {
+        return requestHeaders;
+    }
+
+    public void setRequestHeaders(HeaderTransformProperties requestHeaders) {
+        this.requestHeaders = requestHeaders;
+    }
+
+    public HeaderTransformProperties getResponseHeaders() {
+        return responseHeaders;
+    }
+
+    public void setResponseHeaders(HeaderTransformProperties responseHeaders) {
+        this.responseHeaders = responseHeaders;
     }
 }

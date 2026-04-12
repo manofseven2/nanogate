@@ -47,17 +47,18 @@
     4.  If the failure rate for a specific server exceeds a threshold, the circuit will "open," causing subsequent requests to that server to fail instantly for a configured duration.
     5.  When a `CallNotPermittedException` is caught (indicating an open circuit), the `RoutingFilter` will immediately attempt to retry the request on a *different* healthy server via the Load Balancer.
 
-## Task 6: Header Transformation & Manipulation
+## Task 6: Simple Header Transformation
 *   **Goal:** Allow administrators to shape HTTP traffic by adding, removing, or overwriting headers.
 *   **Definition:**
     1.  Extend the `Route` configuration model to include properties for `addRequestHeaders`, `removeRequestHeaders`, `addResponseHeaders`, and `removeResponseHeaders`.
-    2.  Update `RequestProxy` to apply these rules dynamically during the `HttpRequest` construction and before writing the `HttpServletResponse`.
+    2.  Update `RequestProxy` to apply these simple add/remove rules dynamically during the `HttpRequest` construction and before writing the `HttpServletResponse`.
 
-## Task 7: URL Rewriting & Prefix Stripping
-*   **Goal:** Allow NanoGate to expose clean external APIs while routing to complex internal microservice paths.
+## Task 7: Advanced URL & Header Rewriting
+*   **Goal:** Allow NanoGate to expose clean external APIs while routing to complex internal microservice paths and to perform advanced header manipulation.
 *   **Definition:**
     1.  Add `stripPrefix` (integer) and `rewritePath` (regex string) properties to the `Route` model.
-    2.  Update `RequestProxy` to calculate the final `targetUri` based on these rules before forwarding the request (e.g., stripping `/api/users` down to `/` for the downstream service).
+    2.  Update `RequestProxy` to calculate the final `targetUri` based on these rules before forwarding the request.
+    3.  Enhance the header transformation engine to support renaming headers and deriving new header values from existing request data (e.g., using a simple templating mechanism like `{header.X-Request-Id}`).
 
 ## Task 8: Core RED Metrics Instrumentation (Prometheus)
 *   **Goal:** Instrument the gateway's core routing and resiliency components with Micrometer to expose essential RED (Rate, Errors, Duration) metrics.

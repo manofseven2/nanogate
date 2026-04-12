@@ -49,3 +49,17 @@ nanogate:
       - id: order-service-route
         path: /api/orders/**
         backend-set: order-service-backend
+        
+      - id: header-transform-route
+        path: /api/headers/**
+        backend-set: user-service-backend
+        requestHeaders:
+          add:
+            X-Gateway-Source: "NanoGate"
+          remove:
+            - "X-Internal-Debug"
+        responseHeaders:
+          add:
+            X-Content-Source: "Backend"
+          remove:
+            - "X-Powered-By"

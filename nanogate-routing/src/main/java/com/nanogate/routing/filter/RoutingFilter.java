@@ -105,16 +105,16 @@ public class RoutingFilter implements Filter {
         }
 
         URI targetUri = optionalTargetUri.get();
-        proxyWithRetry(request, response, targetUri, clientProperties, resilienceProperties, backendSet, strategyName);
+        proxyWithRetry(request, response, targetUri, clientProperties, resilienceProperties, route, backendSet, strategyName);
     }
 
     private void proxyWithRetry(HttpServletRequest request, HttpServletResponse response, URI targetUri,
                                 HttpClientProperties clientProperties, ResilienceProperties resilienceProperties,
-                                BackendSet backendSet, String strategyName) throws IOException {
+                                Route route, BackendSet backendSet, String strategyName) throws IOException {
         
         connectionTracker.increment(targetUri);
         try {
-            requestProxy.proxyRequest(request, response, targetUri, clientProperties, resilienceProperties);
+            requestProxy.proxyRequest(request, response, targetUri, clientProperties, resilienceProperties, route);
         } catch (CallNotPermittedException e) {
             log.warn("Circuit for {} is open. Marking as unhealthy and attempting to find another backend.", targetUri);
             healthCheckService.markAsUnhealthy(targetUri);
@@ -124,7 +124,7 @@ public class RoutingFilter implements Filter {
                     .flatMap(lb -> lb.chooseBackend(backendSet));
 
             if (nextTargetUri.isPresent()) {
-                proxyWithRetry(request, response, nextTargetUri.get(), clientProperties, resilienceProperties, backendSet, strategyName);
+                proxyWithRetry(request, response, nextTargetUri.get(), clientProperties, resilienceProperties, route, backendSet, strategyName);
             } else {
                 log.error("All backends for set '{}' are unavailable after circuit break.", backendSet.getName());
                 response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "All backend instances are currently unavailable.");

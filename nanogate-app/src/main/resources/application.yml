@@ -21,7 +21,7 @@ management:
     web:
       base-path: /actuator # Set the base path for actuator endpoints
       exposure:
-        include: "*" # Expose all actuator endpoints over HTTP (e.g., /actuator/health, /actuator/metrics)
+        include: "*" # Expose all actuator endpoints for simplicity in development
   endpoint:
     health:
       show-details: always # Always show full health details, not just "UP" or "DOWN"

@@ -15,7 +15,7 @@ spring:
     virtual:
       enabled: true
 
-# Actuator Configuration
+# Actuator and Server Configuration
 management:
   endpoints:
     web:
@@ -31,6 +31,9 @@ management:
 
 # NanoGate Core Configuration
 nanogate:
+  security:
+    max-request-body-size: 10MB
+    max-response-body-size: 50MB
   routing:
     enabled: true
     # Global Default HTTP Client Configuration

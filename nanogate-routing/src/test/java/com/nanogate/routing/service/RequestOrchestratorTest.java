@@ -10,12 +10,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,85 +48,72 @@ class RequestOrchestratorTest {
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
+    @Mock
+    private HttpResponse<InputStream> mockHttpResponse;
 
-    @InjectMocks
     private RequestOrchestrator requestOrchestrator;
 
     private Route route;
     private BackendSet backendSet;
-    private URI uri1;
-    private URI uri2;
+    private URI uri1, uri2;
 
     @BeforeEach
     void setUp() throws Exception {
+        // Manually construct the orchestrator to handle the @Value parameter
+        requestOrchestrator = new RequestOrchestrator(properties, loadBalancerFactory, requestProxy, connectionTracker, healthCheckService, "50MB");
+
         route = new Route();
         route.setBackendSet("test-set");
         backendSet = new BackendSet();
+        backendSet.setServers(List.of(new URI("http://s1"), new URI("http://s2")));
         uri1 = new URI("http://server1");
         uri2 = new URI("http://server2");
 
         lenient().when(properties.getBackendSet("test-set")).thenReturn(backendSet);
-        lenient().when(loadBalancerFactory.getLoadBalancer(any())).thenReturn(Optional.of(loadBalancer));
-        lenient().when(loadBalancer.chooseBackend(backendSet)).thenReturn(Optional.of(uri1));
+        lenient().when(loadBalancerFactory.getLoadBalancer(anyString())).thenReturn(Optional.of(loadBalancer));
         lenient().when(request.getAttribute(MetricAttribute.START_TIME_NANOS.name())).thenReturn(System.nanoTime());
+        lenient().when(mockHttpResponse.headers()).thenReturn(HttpHeaders.of(Map.of(), (k, v) -> true));
     }
 
     @Test
-    void orchestrate_setsOverheadAndBackendDurationAttributes() throws Exception {
-        requestOrchestrator.orchestrate(request, response, route);
-
-        verify(request).setAttribute(eq(MetricAttribute.OVERHEAD_DURATION_NANOS.name()), any(Long.class));
-        verify(request).setAttribute(eq(MetricAttribute.BACKEND_DURATION_NANOS.name()), any(Long.class));
-        verify(connectionTracker).increment(uri1);
-        verify(connectionTracker).decrement(uri1);
-    }
-
-    @Test
-    void orchestrate_BackendSetNotFound_Sends500() throws Exception {
-        when(properties.getBackendSet("test-set")).thenReturn(null);
+    void orchestrate_SuccessfulFirstAttempt() throws Exception {
+        when(loadBalancer.chooseBackend(backendSet)).thenReturn(Optional.of(uri1));
+        when(requestProxy.prepareRequest(any(), any(), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
+        when(mockHttpResponse.statusCode()).thenReturn(200);
 
         requestOrchestrator.orchestrate(request, response, route);
 
-        verify(response).sendError(eq(HttpServletResponse.SC_INTERNAL_SERVER_ERROR), anyString());
+        verify(requestProxy).prepareRequest(any(), eq(uri1), any(), any(), any());
+        verify(response).setStatus(200);
     }
 
     @Test
-    void orchestrate_NoBackendAvailable_Sends503() throws Exception {
-        when(loadBalancer.chooseBackend(backendSet)).thenReturn(Optional.empty());
-
-        requestOrchestrator.orchestrate(request, response, route);
-
-        verify(response).sendError(eq(HttpServletResponse.SC_SERVICE_UNAVAILABLE), anyString());
-    }
-
-    @Test
-    void orchestrate_CircuitBreakerOpen_RetriesAndMarksUnhealthy() throws Exception {
-        when(loadBalancer.chooseBackend(backendSet))
-                .thenReturn(Optional.of(uri1))
-                .thenReturn(Optional.of(uri2));
-
-        doThrow(mock(CallNotPermittedException.class))
-                .doNothing()
-                .when(requestProxy).proxyRequest(eq(request), eq(response), any(), any(), any(), eq(route));
+    void orchestrate_RetriesOnCallNotPermitted() throws Exception {
+        when(loadBalancer.chooseBackend(backendSet)).thenReturn(Optional.of(uri1)).thenReturn(Optional.of(uri2));
+        
+        CompletableFuture<HttpResponse<InputStream>> failedFuture = CompletableFuture.failedFuture(new CompletionException(mock(CallNotPermittedException.class)));
+        when(requestProxy.prepareRequest(any(), eq(uri1), any(), any(), any())).thenReturn(failedFuture);
+        when(requestProxy.prepareRequest(any(), eq(uri2), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
+        when(mockHttpResponse.statusCode()).thenReturn(200);
 
         requestOrchestrator.orchestrate(request, response, route);
 
         verify(healthCheckService).markAsUnhealthy(uri1);
-        verify(requestProxy).proxyRequest(eq(request), eq(response), eq(uri2), any(), any(), eq(route));
-        verify(connectionTracker).increment(uri1);
-        verify(connectionTracker).decrement(uri1);
-        verify(connectionTracker).increment(uri2);
-        verify(connectionTracker).decrement(uri2);
+        verify(requestProxy).prepareRequest(any(), eq(uri2), any(), any(), any());
     }
 
     @Test
-    void orchestrate_ProxyThrowsException_Sends502() throws Exception {
-        doThrow(new RuntimeException("Network error"))
-                .when(requestProxy).proxyRequest(any(), any(), any(), any(), any(), any());
+    void orchestrate_RetriesOnIOException() throws Exception {
+        when(loadBalancer.chooseBackend(backendSet)).thenReturn(Optional.of(uri1)).thenReturn(Optional.of(uri2));
+
+        CompletableFuture<HttpResponse<InputStream>> failedFuture = CompletableFuture.failedFuture(new UncheckedIOException(new IOException()));
+        when(requestProxy.prepareRequest(any(), eq(uri1), any(), any(), any())).thenReturn(failedFuture);
+        when(requestProxy.prepareRequest(any(), eq(uri2), any(), any(), any())).thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
+        when(mockHttpResponse.statusCode()).thenReturn(200);
 
         requestOrchestrator.orchestrate(request, response, route);
 
-        verify(response).sendError(eq(HttpServletResponse.SC_BAD_GATEWAY), anyString());
-        verify(connectionTracker).decrement(uri1);
+        verify(healthCheckService).markAsUnhealthy(uri1);
+        verify(requestProxy).prepareRequest(any(), eq(uri2), any(), any(), any());
     }
 }

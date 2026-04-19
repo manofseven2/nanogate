@@ -1,9 +1,15 @@
 nanogate:
+  security:
+    max-response-body-size: 1MB # Stricter limit for integration tests
   routing:
     enabled: true
     default-http-client:
       connect-timeout: 2s
       response-timeout: 5s
+    default-health-check:
+      path: /health
+      interval: 1s # Check frequently for tests
+      timeout: 500ms
     backend-sets:
       - name: test-backend-1
         load-balancer: ROUND_ROBIN
@@ -14,6 +20,11 @@ nanogate:
         servers:
           - "http://localhost:8082"
           - "http://localhost:8083"
+        resilience:
+          failureRateThreshold: 50.0
+          slidingWindowSize: 10
+          minimumNumberOfCalls: 5
+          waitDurationInOpenState: 10s
       - name: slow-backend
         servers:
           - "http://localhost:8084"
@@ -28,9 +39,15 @@ nanogate:
           - "http://localhost:8088"
           - "http://localhost:8089"
         health-check:
-          path: /health
-          interval: 1s # Check frequently for the test
+          path: /specific-health
+          interval: 1s
           timeout: 500ms
+      - name: streaming-backend
+        servers:
+          - "http://localhost:8090"
+      - name: large-payload-backend
+        servers:
+          - "http://localhost:8091"
     routes:
       - id: exact-route
         path: "/api/exact"
@@ -42,7 +59,7 @@ nanogate:
         path: "/api/slow"
         backend-set: slow-backend
         http-client:
-          response-timeout: 100ms # Very short timeout to force failure
+          response-timeout: 100ms
       - id: least-connections-route
         path: "/api/lc/**"
         backend-set: least-connections-backend
@@ -71,3 +88,9 @@ nanogate:
         requestHeaders:
           add:
             X-Downstream-Trace-Id: "nanogate-{header.X-Request-Id}"
+      - id: streaming-route
+        path: "/api/streaming/**"
+        backend-set: streaming-backend
+      - id: large-post-route
+        path: "/api/large-post/**"
+        backend-set: large-payload-backend

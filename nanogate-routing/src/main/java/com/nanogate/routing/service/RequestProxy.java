@@ -7,7 +7,6 @@ import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,7 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,21 +41,8 @@ public class RequestProxy {
         this.circuitBreakerProvider = circuitBreakerProvider;
     }
 
-    /**
-     * Proxies the incoming request to the specified target URI using a client with the given properties.
-     *
-     * @param request The original HttpServletRequest.
-     * @param response The original HttpServletResponse.
-     * @param targetUri The URI of the backend service to forward the request to.
-     * @param clientProperties The resolved HTTP client properties for this request.
-     * @param resilienceProperties The resolved resilience properties for this request.
-     * @param route The matched route which may contain header transformation rules.
-     * @throws IOException If an I/O error occurs during proxying.
-     * @throws InterruptedException If the operation is interrupted.
-     */
-    public void proxyRequest(HttpServletRequest request, HttpServletResponse response, URI targetUri,
-                             HttpClientProperties clientProperties, ResilienceProperties resilienceProperties, Route route)
-            throws IOException, InterruptedException {
+    public CompletableFuture<HttpResponse<InputStream>> prepareRequest(HttpServletRequest request, URI targetUri,
+                                                                         HttpClientProperties clientProperties, ResilienceProperties resilienceProperties, Route route) {
 
         HttpClient httpClient = httpClientProvider.getClient(clientProperties);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
@@ -84,29 +70,13 @@ public class RequestProxy {
         CircuitBreaker circuitBreaker = circuitBreakerProvider.getCircuitBreaker(targetUri, resilienceProperties);
         HttpRequest httpRequest = requestBuilder.build();
 
-        try {
-            HttpResponse<InputStream> backendResponse = circuitBreaker.executeCompletionStage(
-                    () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
-            ).toCompletableFuture().join();
-
-            applyResponseHeaderTransforms(response, backendResponse, route.getResponseHeaders());
-
-            try (InputStream bodyStream = backendResponse.body()) {
-                if (bodyStream != null) {
-                    bodyStream.transferTo(response.getOutputStream());
-                    response.getOutputStream().flush();
-                }
-            }
-        } catch (CompletionException e) {
-            if (e.getCause() instanceof IOException) throw (IOException) e.getCause();
-            if (e.getCause() instanceof InterruptedException) throw (InterruptedException) e.getCause();
-            throw new RuntimeException(e.getCause());
-        }
+        return circuitBreaker.executeCompletionStage(
+                () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofInputStream())
+        ).toCompletableFuture();
     }
 
     private String transformPath(String path, Route route) {
         String modifiedPath = path;
-
         if (route.getStripPrefix() != null && route.getStripPrefix() > 0) {
             String[] segments = path.split("/");
             if (segments.length > route.getStripPrefix()) {
@@ -115,13 +85,10 @@ public class RequestProxy {
                 log.debug("Stripped prefix from path. Original: '{}', New: '{}'", path, modifiedPath);
             }
         }
-
         if (StringUtils.hasText(route.getRewritePath()) && StringUtils.hasText(route.getRewriteReplacement())) {
-            String originalForLog = modifiedPath;
             modifiedPath = modifiedPath.replaceAll(route.getRewritePath(), route.getRewriteReplacement());
-            log.debug("Rewrote path. Original: '{}', New: '{}'", originalForLog, modifiedPath);
+            log.debug("Rewrote path. Original: '{}', New: '{}'", path, modifiedPath);
         }
-
         return modifiedPath;
     }
 
@@ -129,7 +96,6 @@ public class RequestProxy {
         List<String> toRemove = (transforms != null && transforms.remove() != null)
                 ? transforms.remove().stream().map(String::toLowerCase).toList()
                 : Collections.emptyList();
-
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
@@ -137,6 +103,7 @@ public class RequestProxy {
                 log.debug("Removing request header: {}", headerName);
                 continue;
             }
+            // Do not copy restricted headers. Let the HTTP client manage them.
             if (!isHopByHopHeader(headerName) && !headerName.equalsIgnoreCase("host") && !headerName.equalsIgnoreCase("content-length")) {
                 Enumeration<String> headerValues = request.getHeaders(headerName);
                 while (headerValues.hasMoreElements()) {
@@ -144,7 +111,6 @@ public class RequestProxy {
                 }
             }
         }
-
         if (transforms != null && transforms.add() != null) {
             transforms.add().forEach((key, value) -> {
                 String resolvedValue = resolveHeaderPlaceholder(value, request);
@@ -155,9 +121,7 @@ public class RequestProxy {
     }
 
     private String resolveHeaderPlaceholder(String value, HttpServletRequest request) {
-        if (value == null || !value.contains("{")) {
-            return value;
-        }
+        if (value == null || !value.contains("{")) return value;
         Matcher matcher = HEADER_PLACEHOLDER_PATTERN.matcher(value);
         return matcher.replaceAll(matchResult -> {
             String headerName = matchResult.group(1);
@@ -165,30 +129,6 @@ public class RequestProxy {
             log.debug("Resolved placeholder '{{}}' to value '{}'", matchResult.group(0), headerValue);
             return headerValue != null ? headerValue : "";
         });
-    }
-
-    private void applyResponseHeaderTransforms(HttpServletResponse response, HttpResponse<InputStream> backendResponse, HeaderTransformProperties transforms) {
-        response.setStatus(backendResponse.statusCode());
-        List<String> toRemove = (transforms != null && transforms.remove() != null)
-                ? transforms.remove().stream().map(String::toLowerCase).toList()
-                : Collections.emptyList();
-
-        backendResponse.headers().map().forEach((name, values) -> {
-            if (toRemove.contains(name.toLowerCase())) {
-                log.debug("Removing response header: {}", name);
-                return;
-            }
-            if (!isHopByHopHeader(name) && !name.equalsIgnoreCase("content-length") && !name.equalsIgnoreCase("transfer-encoding")) {
-                values.forEach(value -> response.addHeader(name, value));
-            }
-        });
-
-        if (transforms != null && transforms.add() != null) {
-            transforms.add().forEach((key, value) -> {
-                log.debug("Adding/overwriting response header: {}={}", key, value);
-                response.setHeader(key, value);
-            });
-        }
     }
 
     private boolean isHopByHopHeader(String headerName) {

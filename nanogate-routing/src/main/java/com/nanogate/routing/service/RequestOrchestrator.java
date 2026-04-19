@@ -4,6 +4,7 @@ import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.metrics.MetricAttribute;
 import com.nanogate.routing.model.BackendSet;
+import com.nanogate.routing.model.HeaderTransformProperties;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.Route;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -11,12 +12,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.http.HttpResponse;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class RequestOrchestrator {
@@ -28,15 +37,18 @@ public class RequestOrchestrator {
     private final RequestProxy requestProxy;
     private final ActiveConnectionTracker connectionTracker;
     private final HealthCheckService healthCheckService;
+    private final long maxResponseBodySize;
 
     public RequestOrchestrator(NanoGateRouteProperties properties, LoadBalancerFactory loadBalancerFactory,
                                RequestProxy requestProxy, ActiveConnectionTracker connectionTracker,
-                               HealthCheckService healthCheckService) {
+                               HealthCheckService healthCheckService,
+                               @Value("${nanogate.security.max-response-body-size:50MB}") String maxResponseBodySize) {
         this.properties = properties;
         this.loadBalancerFactory = loadBalancerFactory;
         this.requestProxy = requestProxy;
         this.connectionTracker = connectionTracker;
         this.healthCheckService = healthCheckService;
+        this.maxResponseBodySize = DataSize.parse(maxResponseBodySize).toBytes();
     }
 
     public void orchestrate(HttpServletRequest request, HttpServletResponse response, Route route) throws IOException {
@@ -65,7 +77,7 @@ public class RequestOrchestrator {
                 .flatMap(lb -> lb.chooseBackend(backendSet));
 
         if (optionalTargetUri.isEmpty()) {
-            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "No backend instances available for this service.");
+            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "No healthy backend instances available.");
             return;
         }
 
@@ -77,18 +89,87 @@ public class RequestOrchestrator {
         
         connectionTracker.increment(targetUri);
         try {
-            requestProxy.proxyRequest(request, response, targetUri, clientProperties, resilienceProperties, route);
-        } catch (CallNotPermittedException e) {
-            log.warn("Circuit for {} is open. Marking as unhealthy and attempting to find another backend.", targetUri);
-            healthCheckService.markAsUnhealthy(targetUri);
-            proxyWithRetry(request, response, route, backendSet); // Recursive retry
-        } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Error proxying request to backend.");
+            HttpResponse<InputStream> backendResponse = requestProxy.prepareRequest(request, targetUri, clientProperties, resilienceProperties, route).join();
+            
+            long contentLength = backendResponse.headers().firstValueAsLong("Content-Length").orElse(-1L);
+            if (contentLength > maxResponseBodySize) {
+                log.warn("Backend {} returned a response of size {} which exceeds the limit of {}", targetUri, contentLength, maxResponseBodySize);
+                backendResponse.body().close();
+                response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Upstream response payload too large");
+                return;
+            }
+
+            writeResponseToClient(response, backendResponse, route.getResponseHeaders());
+        } catch (CompletionException | UncheckedIOException e) {
+            Throwable rootCause = findRootCause(e);
+            if (rootCause instanceof CallNotPermittedException) {
+                log.warn("Circuit for {} is open. Retrying on a different backend.", targetUri);
+                healthCheckService.markAsUnhealthy(targetUri);
+                proxyWithRetry(request, response, route, backendSet);
+            } else if (rootCause instanceof IOException) {
+                log.warn("Request to {} failed with IO exception. Retrying on a different backend.", targetUri, rootCause);
+                healthCheckService.markAsUnhealthy(targetUri);
+                proxyWithRetry(request, response, route, backendSet);
+            } else {
+                handleUnexpectedException(response, targetUri, e);
+            }
         } finally {
             connectionTracker.decrement(targetUri);
             long backendDuration = System.nanoTime() - backendStartTime;
             request.setAttribute(MetricAttribute.BACKEND_DURATION_NANOS.name(), backendDuration);
         }
+    }
+
+    private Throwable findRootCause(Throwable throwable) {
+        Throwable rootCause = throwable;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause;
+    }
+
+    private void writeResponseToClient(HttpServletResponse response, HttpResponse<InputStream> backendResponse, HeaderTransformProperties transforms) throws IOException {
+        response.setStatus(backendResponse.statusCode());
+        List<String> toRemove = (transforms != null && transforms.remove() != null)
+                ? transforms.remove().stream().map(String::toLowerCase).toList()
+                : Collections.emptyList();
+
+        if (backendResponse.headers() != null) {
+            backendResponse.headers().map().forEach((name, values) -> {
+                if (toRemove.contains(name.toLowerCase())) {
+                    log.debug("Removing response header: {}", name);
+                    return;
+                }
+                if (!isHopByHopHeader(name)) {
+                    values.forEach(value -> response.addHeader(name, value));
+                }
+            });
+        }
+
+        if (transforms != null && transforms.add() != null) {
+            transforms.add().forEach((key, value) -> {
+                log.debug("Adding/overwriting response header: {}={}", key, value);
+                response.setHeader(key, value);
+            });
+        }
+
+        try (InputStream bodyStream = backendResponse.body()) {
+            if (bodyStream != null) {
+                bodyStream.transferTo(response.getOutputStream());
+                response.getOutputStream().flush();
+            }
+        }
+    }
+
+    private void handleUnexpectedException(HttpServletResponse response, URI targetUri, Exception e) throws IOException {
+        log.error("An unexpected, non-retryable error occurred during proxying to {}", targetUri, e);
+        if (!response.isCommitted()) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected gateway error occurred.");
+        }
+    }
+
+    private boolean isHopByHopHeader(String headerName) {
+        return List.of("connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade").contains(headerName.toLowerCase());
     }
 
     private HttpClientProperties resolveHttpClientProperties(Route route, BackendSet backendSet) {

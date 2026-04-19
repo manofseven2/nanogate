@@ -11,7 +11,7 @@ import java.util.List;
  */
 public class BackendSet {
     private String name;
-    private String loadBalancer;
+    private String loadBalancer = "ROUND_ROBIN"; // Default value
     private List<URI> servers;
     private HttpClientProperties httpClient;
     private HealthCheckProperties healthCheck;

@@ -18,7 +18,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
@@ -127,5 +126,24 @@ class ResiliencyAndStreamingIT {
             assertEquals(200, response.statusCode(), "Request should succeed and be rerouted to the healthy backend");
             assertEquals("backend-3", response.body());
         }
+    }
+
+    @Test
+    void testResponse_ExceedsLimit_Returns502() throws Exception {
+        int oversized = 2 * 1024 * 1024; // 2MB
+        streamingBackend.stubFor(get(urlEqualTo("/api/streaming/oversized"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Length", String.valueOf(oversized))
+                        .withBody(new byte[oversized])));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(getBaseUrl() + "/api/streaming/oversized"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertEquals(502, response.statusCode(), "Gateway should return 502 Bad Gateway for oversized upstream response");
     }
 }

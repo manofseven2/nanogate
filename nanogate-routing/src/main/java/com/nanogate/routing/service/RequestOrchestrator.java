@@ -12,16 +12,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.util.unit.DataSize;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpResponse;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class RequestOrchestrator {
@@ -33,15 +37,18 @@ public class RequestOrchestrator {
     private final RequestProxy requestProxy;
     private final ActiveConnectionTracker connectionTracker;
     private final HealthCheckService healthCheckService;
+    private final long maxResponseBodySize;
 
     public RequestOrchestrator(NanoGateRouteProperties properties, LoadBalancerFactory loadBalancerFactory,
                                RequestProxy requestProxy, ActiveConnectionTracker connectionTracker,
-                               HealthCheckService healthCheckService) {
+                               HealthCheckService healthCheckService,
+                               @Value("${nanogate.security.max-response-body-size:50MB}") String maxResponseBodySize) {
         this.properties = properties;
         this.loadBalancerFactory = loadBalancerFactory;
         this.requestProxy = requestProxy;
         this.connectionTracker = connectionTracker;
         this.healthCheckService = healthCheckService;
+        this.maxResponseBodySize = DataSize.parse(maxResponseBodySize).toBytes();
     }
 
     public void orchestrate(HttpServletRequest request, HttpServletResponse response, Route route) throws IOException {
@@ -83,8 +90,17 @@ public class RequestOrchestrator {
         connectionTracker.increment(targetUri);
         try {
             HttpResponse<InputStream> backendResponse = requestProxy.prepareRequest(request, targetUri, clientProperties, resilienceProperties, route).join();
+            
+            long contentLength = backendResponse.headers().firstValueAsLong("Content-Length").orElse(-1L);
+            if (contentLength > maxResponseBodySize) {
+                log.warn("Backend {} returned a response of size {} which exceeds the limit of {}", targetUri, contentLength, maxResponseBodySize);
+                backendResponse.body().close();
+                response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Upstream response payload too large");
+                return;
+            }
+
             writeResponseToClient(response, backendResponse, route.getResponseHeaders());
-        } catch (Exception e) {
+        } catch (CompletionException | UncheckedIOException e) {
             Throwable rootCause = findRootCause(e);
             if (rootCause instanceof CallNotPermittedException) {
                 log.warn("Circuit for {} is open. Retrying on a different backend.", targetUri);

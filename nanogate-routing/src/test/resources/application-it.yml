@@ -1,4 +1,6 @@
 nanogate:
+  security:
+    max-response-body-size: 1MB # Stricter limit for integration tests
   routing:
     enabled: true
     default-http-client:

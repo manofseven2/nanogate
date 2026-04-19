@@ -10,7 +10,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,7 +51,6 @@ class RequestOrchestratorTest {
     @Mock
     private HttpResponse<InputStream> mockHttpResponse;
 
-    @InjectMocks
     private RequestOrchestrator requestOrchestrator;
 
     private Route route;
@@ -61,6 +59,9 @@ class RequestOrchestratorTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Manually construct the orchestrator to handle the @Value parameter
+        requestOrchestrator = new RequestOrchestrator(properties, loadBalancerFactory, requestProxy, connectionTracker, healthCheckService, "50MB");
+
         route = new Route();
         route.setBackendSet("test-set");
         backendSet = new BackendSet();
@@ -71,7 +72,6 @@ class RequestOrchestratorTest {
         lenient().when(properties.getBackendSet("test-set")).thenReturn(backendSet);
         lenient().when(loadBalancerFactory.getLoadBalancer(anyString())).thenReturn(Optional.of(loadBalancer));
         lenient().when(request.getAttribute(MetricAttribute.START_TIME_NANOS.name())).thenReturn(System.nanoTime());
-        
         lenient().when(mockHttpResponse.headers()).thenReturn(HttpHeaders.of(Map.of(), (k, v) -> true));
     }
 

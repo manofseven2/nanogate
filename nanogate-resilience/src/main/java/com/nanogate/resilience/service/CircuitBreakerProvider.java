@@ -7,6 +7,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.http.HttpResponse;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -16,10 +17,7 @@ public class CircuitBreakerProvider {
     private final CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
 
     public CircuitBreaker getCircuitBreaker(URI serverUri, ResilienceProperties properties) {
-        // Create a unique name for the circuit breaker based on the server URI
         String breakerName = serverUri.toString();
-        
-        // Return the cached circuit breaker if it exists, otherwise create a new one
         return circuitBreakerCache.computeIfAbsent(breakerName, name -> {
             CircuitBreakerConfig config = buildCircuitBreakerConfig(properties);
             return registry.circuitBreaker(name, config);
@@ -47,6 +45,14 @@ public class CircuitBreakerProvider {
         if (props.waitDurationInOpenState() != null) {
             builder.waitDurationInOpenState(props.waitDurationInOpenState());
         }
+
+        // This is the crucial fix: treat 5xx responses as failures
+        builder.recordResult(response -> {
+            if (response instanceof HttpResponse) {
+                return ((HttpResponse<?>) response).statusCode() >= 500;
+            }
+            return false;
+        });
 
         return builder.build();
     }

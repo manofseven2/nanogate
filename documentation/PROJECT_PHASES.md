@@ -33,10 +33,9 @@ This document outlines the phased approach for developing the **NanoGate** API G
 
 ---
 
-## Phase 3: Cross-Cutting Concerns & Transformation
+## Phase 3: Cross-Cutting Concerns
 **Goal:** Introduce the necessary API management features that decouple clients from backend complexities.
 
-*   **Scripting / Request Transformer:** Integrate a lightweight scripting engine (e.g., GraalVM JavaScript or a custom DSL) to allow dynamic modification of URLs, headers, and JSON payloads on the fly.
 *   **Rate Limiting:** Implement basic in-memory rate limiting, with an architecture designed to plug in Redis for distributed limits later.
 *   **CORS & Caching:** Add centralized management for Cross-Origin Resource Sharing (CORS) policies and basic HTTP response caching.
 *   **Lightweight Threat Protection:** Implement payload size restrictions to prevent OOM errors and basic IP allowlisting/blocklisting capabilities.
@@ -97,3 +96,4 @@ This document outlines the phased approach for developing the **NanoGate** API G
 *   **Customizable Health Checks:** Allow configuration of health check paths, intervals, and failure thresholds per Backend Set.
 *   **Fine-Grained Resiliency Tuning:** Expose more detailed configuration for Circuit Breaker thresholds, retry policies, and timeout durations.
 *   **WebSocket Protocol Support:** Seamlessly proxy WebSocket (ws/wss) connections, including sub-protocol negotiation.
+*   **Dynamic Request Transformer:** Integrate a lightweight declarative rule engine to allow dynamic modification of URLs, headers, and JSON payloads on the fly without custom scripting overhead.

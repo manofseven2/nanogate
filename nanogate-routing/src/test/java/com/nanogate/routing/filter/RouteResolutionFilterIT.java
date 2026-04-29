@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = NanoGateRoutingTestApp.class)
 @ActiveProfiles("it")
-class RoutingFilterIT {
+class RouteResolutionFilterIT {
 
     @LocalServerPort
     private int localPort;

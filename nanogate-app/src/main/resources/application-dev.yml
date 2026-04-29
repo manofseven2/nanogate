@@ -7,6 +7,19 @@ logging:
 
 # Development-specific routing configuration
 nanogate:
+  security:
+    ip-sets:
+      - name: internal-only
+        type: ALLOW
+        ips:
+          - "127.0.0.1"
+          - "10.0.0.0/8"
+          - "192.168.0.0/16"
+      - name: block-bad-actors
+        type: BLOCK
+        ips:
+          - "203.0.113.50"
+          - "198.51.100.0/24"
   routing:
     # Define backend sets for local development (e.g., pointing to localhost)
     backend-sets:
@@ -69,3 +82,13 @@ nanogate:
             X-Content-Source: "Backend"
           remove:
             - "X-Powered-By"
+
+      - id: internal-admin-route
+        path: /api/admin/**
+        backend-set: user-service-backend
+        ip-set: internal-only
+      
+      - id: public-user-route
+        path: /api/public/**
+        backend-set: user-service-backend
+        ip-set: block-bad-actors

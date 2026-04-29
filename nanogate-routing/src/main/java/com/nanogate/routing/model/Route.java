@@ -19,6 +19,7 @@ public class Route {
     private Integer stripPrefix;
     private String rewritePath;
     private String rewriteReplacement;
+    private String ipSet;
 
     public String getId() {
         return id;
@@ -106,5 +107,13 @@ public class Route {
 
     public void setRewriteReplacement(String rewriteReplacement) {
         this.rewriteReplacement = rewriteReplacement;
+    }
+
+    public String getIpSet() {
+        return ipSet;
+    }
+
+    public void setIpSet(String ipSet) {
+        this.ipSet = ipSet;
     }
 }

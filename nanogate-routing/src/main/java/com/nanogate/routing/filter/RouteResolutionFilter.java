@@ -1,8 +1,8 @@
 package com.nanogate.routing.filter;
 
 import com.nanogate.routing.model.Route;
-import com.nanogate.routing.service.RequestOrchestrator;
 import com.nanogate.routing.service.RouteLocator;
+import com.nanogate.security.SecurityConstants;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,20 +20,18 @@ import java.io.IOException;
 import java.util.Optional;
 
 @Component
-@Order(1) // Runs after the MetricsFilter
-public class RoutingFilter implements Filter {
+@Order(1) // Runs first among NanoGate core filters
+public class RouteResolutionFilter implements Filter {
 
-    private static final Logger log = LoggerFactory.getLogger(RoutingFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(RouteResolutionFilter.class);
 
     private final RouteLocator routeLocator;
-    private final RequestOrchestrator requestOrchestrator;
 
     @Value("${management.endpoints.web.base-path:/actuator}")
     private String actuatorBasePath;
 
-    public RoutingFilter(RouteLocator routeLocator, RequestOrchestrator requestOrchestrator) {
+    public RouteResolutionFilter(RouteLocator routeLocator) {
         this.routeLocator = routeLocator;
-        this.requestOrchestrator = requestOrchestrator;
     }
 
     @Override
@@ -56,6 +54,15 @@ public class RoutingFilter implements Filter {
             return;
         }
 
-        requestOrchestrator.orchestrate(request, response, optionalRoute.get());
+        Route route = optionalRoute.get();
+        if (route.getIpSet() != null) {
+            request.setAttribute(SecurityConstants.IP_SET_ATTRIBUTE, route.getIpSet());
+        }
+        
+        // We can pass the whole route object, but since other filters are decoupled,
+        // we pass the necessary identifiers or we can just pass the whole route.
+        request.setAttribute("NANO_ROUTE", route);
+
+        filterChain.doFilter(servletRequest, servletResponse);
     }
 }

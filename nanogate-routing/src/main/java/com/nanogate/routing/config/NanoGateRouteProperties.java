@@ -4,6 +4,7 @@ import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.model.HttpClientProperties;
+import com.nanogate.routing.model.RateLimitProperties;
 import com.nanogate.routing.model.Route;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class NanoGateRouteProperties {
     private HttpClientProperties defaultHttpClient;
     private ResilienceProperties defaultResilience;
     private HealthCheckProperties defaultHealthCheck;
+    private RateLimitProperties defaultRateLimit;
     private List<Route> routes = new ArrayList<>();
     private List<BackendSet> backendSets = new ArrayList<>();
 
@@ -112,6 +114,14 @@ public class NanoGateRouteProperties {
 
     public void setDefaultHealthCheck(HealthCheckProperties defaultHealthCheck) {
         this.defaultHealthCheck = defaultHealthCheck;
+    }
+
+    public RateLimitProperties getDefaultRateLimit() {
+        return defaultRateLimit;
+    }
+
+    public void setDefaultRateLimit(RateLimitProperties defaultRateLimit) {
+        this.defaultRateLimit = defaultRateLimit;
     }
 
     public List<Route> getRoutes() {

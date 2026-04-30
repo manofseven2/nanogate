@@ -41,6 +41,9 @@ nanogate:
           slidingWindowSize: 10
           minimumNumberOfCalls: 5
           waitDurationInOpenState: 10s
+        rate-limit:
+          requestsPerSecond: 10 # Default backend limit
+          resolver: "IP"
 
       - name: order-service-backend
         load-balancer: ROUND_ROBIN
@@ -92,3 +95,7 @@ nanogate:
         path: /api/public/**
         backend-set: user-service-backend
         ip-set: block-bad-actors
+        rate-limit:
+          requestsPerSecond: 2 # Strict override for this public route
+          resolver: "HEADER"
+          resolverArg: "X-API-Key"

@@ -120,5 +120,29 @@ class RouteResolutionFilterIT {
         assertFalse(loggedRequest.containsHeader("X-Internal-Debug"), "Backend should not have received X-Internal-Debug");
     }
     
+    @Test
+    void testRateLimiting() throws Exception {
+        backend1.stubFor(get(urlEqualTo("/api/ratelimit/test"))
+                .willReturn(aResponse().withStatus(200).withBody("ok")));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(getBaseUrl() + "/api/ratelimit/test"))
+                .header("X-Forwarded-For", "192.168.1.50")
+                .GET()
+                .build();
+
+        // 1st request should pass
+        HttpResponse<String> response1 = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response1.statusCode());
+
+        // 2nd request should pass
+        HttpResponse<String> response2 = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response2.statusCode());
+
+        // 3rd request should hit the rate limit (2 req/sec) and fail with 429
+        HttpResponse<String> response3 = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(429, response3.statusCode());
+    }
+
     // --- All other existing tests remain here ---
 }

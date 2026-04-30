@@ -20,6 +20,7 @@ public class Route {
     private String rewritePath;
     private String rewriteReplacement;
     private String ipSet;
+    private RateLimitProperties rateLimit;
 
     public String getId() {
         return id;
@@ -115,5 +116,13 @@ public class Route {
 
     public void setIpSet(String ipSet) {
         this.ipSet = ipSet;
+    }
+
+    public RateLimitProperties getRateLimit() {
+        return rateLimit;
+    }
+
+    public void setRateLimit(RateLimitProperties rateLimit) {
+        this.rateLimit = rateLimit;
     }
 }

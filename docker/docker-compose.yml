@@ -1,5 +1,3 @@
-version: '3.8'
-
 # This Docker Compose file sets up a mock environment for local development.
 # It uses WireMock to simulate the backend services defined in application-dev.yml.
 #

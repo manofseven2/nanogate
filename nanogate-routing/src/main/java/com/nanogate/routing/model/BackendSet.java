@@ -16,6 +16,7 @@ public class BackendSet {
     private HttpClientProperties httpClient;
     private HealthCheckProperties healthCheck;
     private ResilienceProperties resilience;
+    private RateLimitProperties rateLimit;
 
     public String getName() {
         return name;
@@ -63,5 +64,13 @@ public class BackendSet {
 
     public void setResilience(ResilienceProperties resilience) {
         this.resilience = resilience;
+    }
+
+    public RateLimitProperties getRateLimit() {
+        return rateLimit;
+    }
+
+    public void setRateLimit(RateLimitProperties rateLimit) {
+        this.rateLimit = rateLimit;
     }
 }

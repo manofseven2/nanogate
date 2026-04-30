@@ -13,14 +13,15 @@
     4. Modify `RoutingFilter.java` so that it validates the request IP against the configured `IpSet` only *after* a route is matched. If the route has no IP rules, the check is bypassed entirely.
 *   **Use Case:** A developer defines an `IpSet` called "corporate-vpn". They can easily apply this restriction to 10 internal routes by just referencing the name "corporate-vpn", while 50 public routes remain unhindered by any IP validation logic.
 
-## Task 2: Basic In-Memory Rate Limiting
-*   **Goal:** Protect backend services from traffic spikes and abuse by limiting the number of requests allowed within a time window.
+## Task 2: Advanced Rate Limiting with Strategy Pattern & Clean Architecture
+*   **Goal:** Protect backend services from traffic spikes and abuse by applying highly configurable, cascading rate limits (Route > BackendSet > Global).
 *   **Definition:**
-    1. Introduce `resilience4j-ratelimiter` into the `nanogate-routing` or `nanogate-resilience` module.
-    2. Add a `RateLimitProperties` model to the `Route` configuration to allow rate limits to be configured per route (e.g., `requestsPerSecond`).
-    3. Create a `RateLimitFilter.java` that uses a `ConcurrentHashMap` to store individual `RateLimiter` instances keyed by the client's IP address.
-    4. When a limit is exceeded, immediately return a `429 Too Many Requests` response.
-*   **Use Case:** A public API route is limited to 10 requests per second per IP address to prevent a single client from overwhelming the backend database.
+    1. Introduce `resilience4j-ratelimiter` into `nanogate-resilience`.
+    2. Abstract rate limiting behind a `RateLimiterService` interface to support future centralization (e.g., Redis).
+    3. Introduce a `RateLimitProperties` model that cascades across `NanoGateRouteProperties` (global), `BackendSet`, and `Route` configurations. It includes properties for `requestsPerSecond`, `resolver` (e.g., IP, HEADER), and `resolverArg`.
+    4. Create a `RateLimitKeyResolver` strategy pattern (IP, Header, etc.) for dynamic key extraction from requests.
+    5. Create a `RateLimitFilter.java` that coordinates resolving the properties, extracting the key, and delegating the limit check to the service. Returns `429 Too Many Requests` if exceeded.
+*   **Use Case:** A public API route is limited to 10 requests per second based on an extracted API Key header, while another internal route falls back to the backend-set's default limit of 50 requests per second per IP address.
 
 ## Task 3: Centralized CORS Management
 *   **Goal:** Allow NanoGate to cleanly handle Cross-Origin Resource Sharing (CORS) preflight requests and response headers without pushing this logic to backend services.

@@ -94,3 +94,9 @@ nanogate:
       - id: large-post-route
         path: "/api/large-post/**"
         backend-set: large-payload-backend
+      - id: rate-limited-route
+        path: "/api/ratelimit/**"
+        backend-set: test-backend-1
+        rate-limit:
+          requestsPerSecond: 2
+          resolver: "IP"

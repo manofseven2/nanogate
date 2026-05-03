@@ -4,9 +4,12 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.nanogate.routing.NanoGateRoutingTestApp;
+import com.nanogate.routing.service.HealthCheckService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
@@ -27,6 +30,9 @@ class CorsFilterIT {
     @LocalServerPort
     private int port;
 
+    @Autowired
+    private HealthCheckService healthCheckService;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))
             .build();
@@ -39,6 +45,9 @@ class CorsFilterIT {
         wireMockServer1.start();
         
         // Mock backend
+        wireMockServer1.stubFor(WireMock.get(WireMock.urlEqualTo("/health"))
+                .willReturn(WireMock.aResponse().withStatus(200)));
+
         wireMockServer1.stubFor(WireMock.get(WireMock.urlMatching("/api/cors/.*"))
                 .willReturn(WireMock.aResponse().withStatus(200).withBody("CORS Backend Success")));
     }
@@ -48,6 +57,15 @@ class CorsFilterIT {
         if (wireMockServer1 != null) {
             wireMockServer1.stop();
         }
+    }
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // Manually trigger health check to ensure backend is marked UP
+        ((com.nanogate.routing.service.ActiveHealthCheckService) healthCheckService).checkServerHealth(
+                new URI("http://localhost:8081"),
+                new com.nanogate.routing.model.HealthCheckProperties("/health", null, null)
+        ).join();
     }
 
     @Test

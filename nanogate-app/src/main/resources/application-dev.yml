@@ -108,3 +108,8 @@ nanogate:
             - "POST"
             - "OPTIONS"
           allowCredentials: true
+        cache:
+          enabled: true
+          ttl: 60s
+          vary-by-headers:
+            - "Accept-Language"

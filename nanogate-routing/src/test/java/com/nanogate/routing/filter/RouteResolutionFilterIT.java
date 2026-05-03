@@ -71,7 +71,16 @@ class RouteResolutionFilterIT {
 
     @BeforeEach
     void resetWireMock() {
-        List.of(backend1, backend2, backend3, slowBackend, leastConnBackend1, leastConnBackend2, healthCheckBackend1, healthCheckBackend2).forEach(WireMockServer::resetAll);
+        List.of(backend1, backend2, backend3, slowBackend, leastConnBackend1, leastConnBackend2, healthCheckBackend1, healthCheckBackend2).forEach(s -> {
+            s.resetAll();
+            s.stubFor(get(urlEqualTo("/health")).willReturn(aResponse().withStatus(200)));
+            s.stubFor(get(urlEqualTo("/specific-health")).willReturn(aResponse().withStatus(200)));
+            try {
+                healthCheckService.checkServerHealth(new URI("http://localhost:" + s.port()), new HealthCheckProperties("/health", null, null)).join();
+            } catch (Exception e) {
+                // Ignore
+            }
+        });
     }
 
     private String getBaseUrl() {

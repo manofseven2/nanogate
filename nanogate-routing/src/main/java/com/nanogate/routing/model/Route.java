@@ -22,6 +22,7 @@ public class Route {
     private String ipSet;
     private RateLimitProperties rateLimit;
     private CorsProperties cors;
+    private CacheProperties cache;
 
     public String getId() {
         return id;
@@ -133,5 +134,13 @@ public class Route {
 
     public void setCors(CorsProperties cors) {
         this.cors = cors;
+    }
+
+    public CacheProperties getCache() {
+        return cache;
+    }
+
+    public void setCache(CacheProperties cache) {
+        this.cache = cache;
     }
 }

@@ -21,6 +21,7 @@ public class Route {
     private String rewriteReplacement;
     private String ipSet;
     private RateLimitProperties rateLimit;
+    private CorsProperties cors;
 
     public String getId() {
         return id;
@@ -124,5 +125,13 @@ public class Route {
 
     public void setRateLimit(RateLimitProperties rateLimit) {
         this.rateLimit = rateLimit;
+    }
+
+    public CorsProperties getCors() {
+        return cors;
+    }
+
+    public void setCors(CorsProperties cors) {
+        this.cors = cors;
     }
 }

@@ -15,15 +15,30 @@
     <description>Response caching with Redis</description>
 
     <dependencies>
-        <!-- Spring Cache Abstraction -->
+        <!-- Internal Modules -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-cache</artifactId>
+            <groupId>com.nanogate</groupId>
+            <artifactId>nanogate-routing</artifactId>
+            <version>${project.version}</version>
         </dependency>
-        <!-- Redis for distributed caching -->
+
+        <!-- Spring Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Caffeine Cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- Testing Dependencies managed by parent POM -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

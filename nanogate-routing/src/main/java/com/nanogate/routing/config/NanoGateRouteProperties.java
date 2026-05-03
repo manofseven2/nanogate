@@ -2,6 +2,7 @@ package com.nanogate.routing.config;
 
 import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.model.BackendSet;
+import com.nanogate.routing.model.CacheProperties;
 import com.nanogate.routing.model.CorsProperties;
 import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.model.HttpClientProperties;

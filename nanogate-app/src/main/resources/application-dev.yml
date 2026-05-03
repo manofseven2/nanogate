@@ -99,3 +99,12 @@ nanogate:
           requestsPerSecond: 2 # Strict override for this public route
           resolver: "HEADER"
           resolverArg: "X-API-Key"
+        cors:
+          enabled: true
+          allowedOrigins:
+            - "http://localhost:3000"
+          allowedMethods:
+            - "GET"
+            - "POST"
+            - "OPTIONS"
+          allowCredentials: true

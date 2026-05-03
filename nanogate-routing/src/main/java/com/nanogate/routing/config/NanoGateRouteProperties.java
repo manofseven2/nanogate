@@ -2,6 +2,7 @@ package com.nanogate.routing.config;
 
 import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.model.BackendSet;
+import com.nanogate.routing.model.CorsProperties;
 import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.RateLimitProperties;
@@ -35,6 +36,7 @@ public class NanoGateRouteProperties {
     private ResilienceProperties defaultResilience;
     private HealthCheckProperties defaultHealthCheck;
     private RateLimitProperties defaultRateLimit;
+    private CorsProperties defaultCors;
     private List<Route> routes = new ArrayList<>();
     private List<BackendSet> backendSets = new ArrayList<>();
 
@@ -122,6 +124,14 @@ public class NanoGateRouteProperties {
 
     public void setDefaultRateLimit(RateLimitProperties defaultRateLimit) {
         this.defaultRateLimit = defaultRateLimit;
+    }
+
+    public CorsProperties getDefaultCors() {
+        return defaultCors;
+    }
+
+    public void setDefaultCors(CorsProperties defaultCors) {
+        this.defaultCors = defaultCors;
     }
 
     public List<Route> getRoutes() {

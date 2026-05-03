@@ -100,3 +100,16 @@ nanogate:
         rate-limit:
           requestsPerSecond: 2
           resolver: "IP"
+      - id: cors-route
+        path: "/api/cors/**"
+        backend-set: test-backend-1
+        cors:
+          enabled: true
+          allowedOrigins:
+            - "http://allowed-origin.com"
+          allowedMethods:
+            - "GET"
+            - "POST"
+            - "OPTIONS"
+          allowedHeaders:
+            - "X-Custom-Header"

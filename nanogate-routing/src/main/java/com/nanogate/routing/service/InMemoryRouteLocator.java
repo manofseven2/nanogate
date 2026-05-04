@@ -1,6 +1,6 @@
 package com.nanogate.routing.service;
 
-import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.Route;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -16,16 +16,16 @@ import java.util.Optional;
 @Service
 public class InMemoryRouteLocator implements RouteLocator {
 
-    private final NanoGateRouteProperties properties;
+    private final RouteRegistry routeRegistry;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
-    public InMemoryRouteLocator(NanoGateRouteProperties properties) {
-        this.properties = properties;
+    public InMemoryRouteLocator(RouteRegistry routeRegistry) {
+        this.routeRegistry = routeRegistry;
     }
 
     @Override
     public Optional<Route> findRoute(HttpServletRequest request) {
-        if (!properties.isEnabled()) {
+        if (!routeRegistry.get().isEnabled()) {
             return Optional.empty();
         }
 
@@ -37,7 +37,7 @@ public class InMemoryRouteLocator implements RouteLocator {
 
         // Sort the routes to ensure the most specific path is matched first,
         // then find the first one that matches the request.
-        return properties.getRoutes().stream()
+        return routeRegistry.get().getRoutes().stream()
                 .filter(route -> pathMatcher.match(route.getPath(), requestPath))
                 .min(routeComparator); // .min() with the comparator gives us the "best" or most specific match
     }

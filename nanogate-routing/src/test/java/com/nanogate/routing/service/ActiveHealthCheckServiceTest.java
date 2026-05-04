@@ -1,6 +1,7 @@
 package com.nanogate.routing.service;
 
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.HealthCheckProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,12 +21,14 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ActiveHealthCheckServiceTest {
 
     @Mock
+    private RouteRegistry routeRegistry;
     private NanoGateRouteProperties properties;
 
     @Mock
@@ -43,8 +46,10 @@ class ActiveHealthCheckServiceTest {
     void setUp() throws Exception {
         server1 = new URI("http://localhost:8081");
         healthCheckProps = new HealthCheckProperties("/health", Duration.ofSeconds(10), Duration.ofSeconds(2));
-
-        healthCheckService = new ActiveHealthCheckService(properties, healthCheckClient);
+        routeRegistry = mock(RouteRegistry.class);
+        properties = mock(NanoGateRouteProperties.class);
+        org.mockito.Mockito.lenient().when(routeRegistry.get()).thenReturn(properties);
+        healthCheckService = new ActiveHealthCheckService(routeRegistry, healthCheckClient);
     }
 
     @Test

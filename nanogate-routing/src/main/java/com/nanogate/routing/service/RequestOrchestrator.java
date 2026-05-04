@@ -1,7 +1,7 @@
 package com.nanogate.routing.service;
 
 import com.nanogate.resilience.model.ResilienceProperties;
-import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.metrics.MetricAttribute;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HeaderTransformProperties;
@@ -32,18 +32,18 @@ public class RequestOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(RequestOrchestrator.class);
 
-    private final NanoGateRouteProperties properties;
+    private final RouteRegistry routeRegistry;
     private final LoadBalancerFactory loadBalancerFactory;
     private final RequestProxy requestProxy;
     private final ActiveConnectionTracker connectionTracker;
     private final HealthCheckService healthCheckService;
     private final long maxResponseBodySize;
 
-    public RequestOrchestrator(NanoGateRouteProperties properties, LoadBalancerFactory loadBalancerFactory,
+    public RequestOrchestrator(RouteRegistry routeRegistry, LoadBalancerFactory loadBalancerFactory,
                                RequestProxy requestProxy, ActiveConnectionTracker connectionTracker,
                                HealthCheckService healthCheckService,
                                @Value("${nanogate.security.max-response-body-size:50MB}") String maxResponseBodySize) {
-        this.properties = properties;
+        this.routeRegistry = routeRegistry;
         this.loadBalancerFactory = loadBalancerFactory;
         this.requestProxy = requestProxy;
         this.connectionTracker = connectionTracker;
@@ -54,7 +54,7 @@ public class RequestOrchestrator {
     public void orchestrate(HttpServletRequest request, HttpServletResponse response, Route route) throws IOException {
         Long startTime = (Long) request.getAttribute(MetricAttribute.START_TIME_NANOS.name());
         
-        BackendSet backendSet = properties.getBackendSet(route.getBackendSet());
+        BackendSet backendSet = routeRegistry.get().getBackendSet(route.getBackendSet());
         if (backendSet == null) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Gateway configuration error.");
             return;
@@ -173,12 +173,12 @@ public class RequestOrchestrator {
     }
 
     private HttpClientProperties resolveHttpClientProperties(Route route, BackendSet backendSet) {
-        HttpClientProperties globalProps = properties.getDefaultHttpClient() != null ? properties.getDefaultHttpClient() : new HttpClientProperties();
+        HttpClientProperties globalProps = routeRegistry.get().getDefaultHttpClient() != null ? routeRegistry.get().getDefaultHttpClient() : new HttpClientProperties();
         return globalProps.merge(backendSet.getHttpClient()).merge(route.getHttpClient());
     }
 
     private ResilienceProperties resolveResilienceProperties(Route route, BackendSet backendSet) {
-        ResilienceProperties globalProps = properties.getDefaultResilience() != null ? properties.getDefaultResilience() : new ResilienceProperties(null, null, null, null, null, null);
+        ResilienceProperties globalProps = routeRegistry.get().getDefaultResilience() != null ? routeRegistry.get().getDefaultResilience() : new ResilienceProperties(null, null, null, null, null, null);
         return globalProps.merge(backendSet.getResilience()).merge(route.getResilience());
     }
 }

@@ -1,6 +1,7 @@
 package com.nanogate.routing.service;
 
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.metrics.MetricAttribute;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.Route;
@@ -26,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.*;
 class RequestOrchestratorTest {
 
     @Mock
+    private RouteRegistry routeRegistry;
     private NanoGateRouteProperties properties;
     @Mock
     private LoadBalancerFactory loadBalancerFactory;
@@ -60,7 +63,10 @@ class RequestOrchestratorTest {
     @BeforeEach
     void setUp() throws Exception {
         // Manually construct the orchestrator to handle the @Value parameter
-        requestOrchestrator = new RequestOrchestrator(properties, loadBalancerFactory, requestProxy, connectionTracker, healthCheckService, "50MB");
+        routeRegistry = mock(RouteRegistry.class);
+        properties = mock(NanoGateRouteProperties.class);
+        when(routeRegistry.get()).thenReturn(properties);
+        requestOrchestrator = new RequestOrchestrator(routeRegistry, loadBalancerFactory, requestProxy, connectionTracker, healthCheckService, "50MB");
 
         route = new Route();
         route.setBackendSet("test-set");

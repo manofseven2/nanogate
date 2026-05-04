@@ -16,14 +16,17 @@ import static org.mockito.Mockito.when;
 
 class NanoGateCorsConfigurationSourceTest {
 
+    private RouteRegistry routeRegistry;
     private NanoGateRouteProperties routeProperties;
     private NanoGateCorsConfigurationSource source;
     private HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
+        routeRegistry = mock(RouteRegistry.class);
         routeProperties = mock(NanoGateRouteProperties.class);
-        source = new NanoGateCorsConfigurationSource(routeProperties);
+        when(routeRegistry.get()).thenReturn(routeProperties);
+        source = new NanoGateCorsConfigurationSource(routeRegistry);
         request = mock(HttpServletRequest.class);
     }
 

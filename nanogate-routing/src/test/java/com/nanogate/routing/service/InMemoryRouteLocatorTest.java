@@ -1,6 +1,7 @@
 package com.nanogate.routing.service;
 
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.Route;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,24 +17,30 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class InMemoryRouteLocatorTest {
 
     @Mock
+    private RouteRegistry routeRegistry;
     private NanoGateRouteProperties properties;
 
     @Mock
     private HttpServletRequest request;
 
-    @InjectMocks
     private InMemoryRouteLocator routeLocator;
 
     private List<Route> routes;
 
     @BeforeEach
     void setUp() {
+        routeRegistry = mock(RouteRegistry.class);
+        properties = mock(NanoGateRouteProperties.class);
+        when(routeRegistry.get()).thenReturn(properties);
+        routeLocator = new InMemoryRouteLocator(routeRegistry);
+
         routes = new ArrayList<>();
         
         Route catchAllRoute = new Route();

@@ -2,6 +2,7 @@ package com.nanogate.routing.filter;
 
 import com.nanogate.resilience.service.RateLimiterService;
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.RateLimitProperties;
 import com.nanogate.routing.model.Route;
@@ -29,14 +30,14 @@ public class RateLimitFilter implements Filter {
 
     private final RateLimiterService rateLimiterService;
     private final RateLimitKeyResolverFactory keyResolverFactory;
-    private final NanoGateRouteProperties routeProperties;
+    private final RouteRegistry routeRegistry;
 
     public RateLimitFilter(RateLimiterService rateLimiterService,
                            RateLimitKeyResolverFactory keyResolverFactory,
-                           NanoGateRouteProperties routeProperties) {
+                           RouteRegistry routeRegistry) {
         this.rateLimiterService = rateLimiterService;
         this.keyResolverFactory = keyResolverFactory;
-        this.routeProperties = routeProperties;
+        this.routeRegistry = routeRegistry;
     }
 
     @Override
@@ -78,6 +79,7 @@ public class RateLimitFilter implements Filter {
     }
 
     private RateLimitConfig resolveRateLimitConfig(Route route) {
+        NanoGateRouteProperties routeProperties = routeRegistry.get();
         if (route.getRateLimit() != null) {
             return new RateLimitConfig("ROUTE_" + route.getId(), route.getRateLimit());
         }

@@ -15,10 +15,10 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @Component
 public class NanoGateCorsConfigurationSource implements CorsConfigurationSource {
 
-    private final NanoGateRouteProperties routeProperties;
+    private final RouteRegistry routeRegistry;
 
-    public NanoGateCorsConfigurationSource(NanoGateRouteProperties routeProperties) {
-        this.routeProperties = routeProperties;
+    public NanoGateCorsConfigurationSource(RouteRegistry routeRegistry) {
+        this.routeRegistry = routeRegistry;
     }
 
     @Override
@@ -35,6 +35,7 @@ public class NanoGateCorsConfigurationSource implements CorsConfigurationSource 
     }
 
     private CorsProperties resolveCorsProperties(Route route) {
+        NanoGateRouteProperties routeProperties = routeRegistry.get();
         if (route == null) {
             return routeProperties.getDefaultCors();
         }

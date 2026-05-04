@@ -2,7 +2,7 @@ package com.nanogate.caching.filter;
 
 import com.nanogate.caching.model.CachedResponse;
 import com.nanogate.caching.service.ResponseCacheService;
-import com.nanogate.routing.config.NanoGateRouteProperties;
+
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.CacheProperties;
 import com.nanogate.routing.model.Route;

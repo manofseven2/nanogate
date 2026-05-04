@@ -2,6 +2,7 @@ package com.nanogate.routing.filter;
 
 import com.nanogate.resilience.service.RateLimiterService;
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.RateLimitProperties;
 import com.nanogate.routing.model.Route;
 import com.nanogate.routing.ratelimit.RateLimitKeyResolver;
@@ -11,16 +12,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class RateLimitFilterTest {
 
     private RateLimiterService rateLimiterService;
     private RateLimitKeyResolverFactory keyResolverFactory;
+    private RouteRegistry routeRegistry;
     private NanoGateRouteProperties routeProperties;
     private RateLimitFilter filter;
 
@@ -33,8 +31,10 @@ class RateLimitFilterTest {
     void setUp() {
         rateLimiterService = mock(RateLimiterService.class);
         keyResolverFactory = mock(RateLimitKeyResolverFactory.class);
+        routeRegistry = mock(RouteRegistry.class);
         routeProperties = mock(NanoGateRouteProperties.class);
-        filter = new RateLimitFilter(rateLimiterService, keyResolverFactory, routeProperties);
+        org.mockito.Mockito.lenient().when(routeRegistry.get()).thenReturn(routeProperties);
+        filter = new RateLimitFilter(rateLimiterService, keyResolverFactory, routeRegistry);
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);

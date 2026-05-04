@@ -1,6 +1,7 @@
 package com.nanogate.observability.health;
 
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.service.HealthCheckService;
 import org.springframework.boot.health.contributor.Health;
@@ -14,11 +15,11 @@ import java.util.Map;
 @Component("nanogate")
 public class NanoGateHealthIndicator implements HealthIndicator {
 
-    private final NanoGateRouteProperties properties;
+    private final RouteRegistry routeRegistry;
     private final HealthCheckService healthCheckService;
 
-    public NanoGateHealthIndicator(NanoGateRouteProperties properties, HealthCheckService healthCheckService) {
-        this.properties = properties;
+    public NanoGateHealthIndicator(RouteRegistry routeRegistry, HealthCheckService healthCheckService) {
+        this.routeRegistry = routeRegistry;
         this.healthCheckService = healthCheckService;
     }
 
@@ -26,6 +27,7 @@ public class NanoGateHealthIndicator implements HealthIndicator {
     public Health health() {
         Health.Builder builder = Health.up();
         boolean isGatewayOverallHealthy = true;
+        NanoGateRouteProperties properties = routeRegistry.get();
 
         for (BackendSet backendSet : properties.getBackendSets()) {
             Map<String, Object> backendSetDetails = new LinkedHashMap<>();

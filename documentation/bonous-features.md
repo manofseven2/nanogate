@@ -72,3 +72,24 @@ For maximum availability, especially in a monolith or a service with many divers
     *   **Con:** Adds complexity to configuration and monitoring.
 
 This is a powerful feature common in advanced service meshes like Istio and could be considered for a future "enterprise-grade" version of NanoGate.
+
+---
+
+## 3. Spring Cloud Config Integration
+
+### Context
+While Phase 4 focuses on a "standalone-first" approach to zero-downtime configuration (using custom `ConfigurationProvider` and `AtomicReference` logic), integrating with **Spring Cloud Config** is a powerful bonus feature for larger enterprise environments.
+
+### Benefits
+*   **Industry Standard**: It is the de-facto standard for externalized configuration in the Spring ecosystem.
+*   **Native Hot Reloading**: Using `@RefreshScope`, Spring automatically handles the "swapping" of bean instances when configuration changes, which is much cleaner than manually managing thread-safe reference swaps in filter logic.
+*   **Git-Backed Config**: Allows the gateway's routing table to be managed via a Git repository, providing a full audit trail and rollback capabilities.
+*   **Centralized Management**: In a large cluster, a single POST to `/actuator/refresh` (or a message via Spring Cloud Bus) can update the routing tables of 100+ instances simultaneously.
+
+### Implementation Path
+1.  Add `spring-cloud-starter-config` to the project dependencies.
+2.  Annotate `NanoGateRouteProperties` with `@RefreshScope`.
+3.  Enable the `/actuator/refresh` endpoint in Spring Boot Actuator.
+4.  Configure the gateway to point to a central Config Server.
+
+This feature would be an excellent "enterprise add-on" that allows NanoGate to scale horizontally in complex, multi-service environments.

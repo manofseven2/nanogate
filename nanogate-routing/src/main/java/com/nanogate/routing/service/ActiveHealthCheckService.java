@@ -1,11 +1,14 @@
 package com.nanogate.routing.service;
 
+import com.nanogate.routing.config.ConfigurationRefreshedEvent;
 import com.nanogate.routing.config.NanoGateRouteProperties;
+import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.model.BackendSet;
 import com.nanogate.routing.model.HealthCheckProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +29,7 @@ public class ActiveHealthCheckService implements HealthCheckService {
 
     private static final Logger log = LoggerFactory.getLogger(ActiveHealthCheckService.class);
 
-    private final NanoGateRouteProperties properties;
+    private final RouteRegistry routeRegistry;
     private final ConcurrentHashMap<URI, AtomicBoolean> healthStatusMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastCheckTimeMap = new ConcurrentHashMap<>();
     private final HttpClient healthCheckClient;
@@ -34,14 +37,15 @@ public class ActiveHealthCheckService implements HealthCheckService {
     // This CompletableFuture will be completed when all checks in the last runHealthChecks cycle are done.
     private volatile CompletableFuture<Void> lastRunCompletion = CompletableFuture.completedFuture(null);
 
-    public ActiveHealthCheckService(NanoGateRouteProperties properties,
+    public ActiveHealthCheckService(RouteRegistry routeRegistry,
                                     @Qualifier("healthCheckHttpClient") HttpClient healthCheckClient) {
-        this.properties = properties;
+        this.routeRegistry = routeRegistry;
         this.healthCheckClient = healthCheckClient;
     }
 
     @Scheduled(fixedDelayString = "${nanogate.routing.health-check.ticker-interval:1000}") // Fast, global ticker
     public void runHealthChecks() {
+        NanoGateRouteProperties properties = routeRegistry.get();
         if (!properties.isEnabled()) {
             return;
         }
@@ -127,5 +131,12 @@ public class ActiveHealthCheckService implements HealthCheckService {
 
     public CompletableFuture<Void> getLastRunCompletion() {
         return lastRunCompletion;
+    }
+
+    @EventListener
+    public void onConfigurationRefreshed(ConfigurationRefreshedEvent event) {
+        log.info("Configuration refreshed. Clearing old health check state.");
+        healthStatusMap.clear();
+        lastCheckTimeMap.clear();
     }
 }

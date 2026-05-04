@@ -100,6 +100,13 @@ nanogate:
         rate-limit:
           requestsPerSecond: 2
           resolver: "IP"
+      - id: header-rate-limited-route
+        path: "/api/header-ratelimit/**"
+        backend-set: test-backend-1
+        rate-limit:
+          requestsPerSecond: 1
+          resolver: "HEADER"
+          resolverArg: "X-API-Key"
       - id: cors-route
         path: "/api/cors/**"
         backend-set: test-backend-1

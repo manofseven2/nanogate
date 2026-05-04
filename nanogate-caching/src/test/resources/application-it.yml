@@ -1,0 +1,31 @@
+nanogate:
+  routing:
+    enabled: true
+    default-health-check:
+      path: /health
+      interval: 1s
+      timeout: 500ms
+    backend-sets:
+      - name: cache-backend
+        servers:
+          - "http://localhost:8081"
+    routes:
+      - id: cached-route
+        path: "/api/cached/**"
+        backend-set: cache-backend
+        cache:
+          enabled: true
+          ttl: 60s
+      - id: vary-cached-route
+        path: "/api/vary-cached/**"
+        backend-set: cache-backend
+        cache:
+          enabled: true
+          ttl: 60s
+          vary-by-headers:
+            - "Accept-Language"
+      - id: un-cached-route
+        path: "/api/uncached/**"
+        backend-set: cache-backend
+        cache:
+          enabled: false

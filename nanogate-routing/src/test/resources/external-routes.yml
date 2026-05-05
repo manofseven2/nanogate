@@ -1,0 +1,8 @@
+routes:
+  - id: external-route-1
+    path: /external/v1/**
+    backendSet: test-backend-1
+backendSets:
+  - name: test-backend-1
+    servers:
+      - http://localhost:8081

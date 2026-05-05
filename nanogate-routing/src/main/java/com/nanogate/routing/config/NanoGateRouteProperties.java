@@ -2,15 +2,16 @@ package com.nanogate.routing.config;
 
 import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.model.BackendSet;
-import com.nanogate.routing.model.CacheProperties;
 import com.nanogate.routing.model.CorsProperties;
 import com.nanogate.routing.model.HealthCheckProperties;
 import com.nanogate.routing.model.HttpClientProperties;
 import com.nanogate.routing.model.RateLimitProperties;
 import com.nanogate.routing.model.Route;
+import com.nanogate.security.model.GlobalSecuritySettings;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.nanogate.security.service.GlobalSecurityProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.CollectionUtils;
@@ -24,11 +25,12 @@ import java.util.stream.Collectors;
 
 /**
  * Configuration properties for NanoGate.
- * Binds properties under the 'nanogate.routing' prefix and validates their consistency upon startup.
+ * Binds properties under the 'nanogate.routing' prefix and validates their
+ * consistency upon startup.
  */
 @Configuration
 @ConfigurationProperties(prefix = "nanogate.routing")
-public class NanoGateRouteProperties {
+public class NanoGateRouteProperties implements GlobalSecurityProvider {
 
     private static final Logger log = LoggerFactory.getLogger(NanoGateRouteProperties.class);
 
@@ -40,15 +42,23 @@ public class NanoGateRouteProperties {
     private CorsProperties defaultCors;
     private List<Route> routes = new ArrayList<>();
     private List<BackendSet> backendSets = new ArrayList<>();
+    private GlobalSecuritySettings security = new GlobalSecuritySettings();
 
-    // This map is initialized after properties are loaded to provide efficient lookups.
+    // Remove the inner class since it is now moved to GlobalSecuritySettings in
+    // security module
+
+    // This map is initialized after properties are loaded to provide efficient
+    // lookups.
     private Map<String, BackendSet> backendSetMap = Collections.emptyMap();
 
     /**
-     * This method is automatically called after Spring has finished populating the properties.
-     * It validates that all routes point to existing backend-sets and warns about unmonitored sets.
+     * This method is automatically called after Spring has finished populating the
+     * properties.
+     * It validates that all routes point to existing backend-sets and warns about
+     * unmonitored sets.
      *
-     * @throws IllegalStateException if a route references a non-existent backend-set.
+     * @throws IllegalStateException if a route references a non-existent
+     *                               backend-set.
      */
     @PostConstruct
     public void initializeAndValidate() {
@@ -59,15 +69,17 @@ public class NanoGateRouteProperties {
                             BackendSet::getName,
                             Function.identity(),
                             (existing, replacement) -> {
-                                log.warn("Duplicate backend-set name found: '{}'. The first definition will be used.", existing.getName());
+                                log.warn("Duplicate backend-set name found: '{}'. The first definition will be used.",
+                                        existing.getName());
                                 return existing;
-                            }
-                    ));
-            
+                            }));
+
             // Log warnings for unmonitored backend sets
             for (BackendSet backendSet : backendSets) {
                 if (backendSet.getHealthCheck() == null && defaultHealthCheck == null) {
-                    log.warn("BackendSet '{}' does not have a health-check configured and no default is available. Servers in this set will be assumed healthy and will not be actively monitored.", backendSet.getName());
+                    log.warn(
+                            "BackendSet '{}' does not have a health-check configured and no default is available. Servers in this set will be assumed healthy and will not be actively monitored.",
+                            backendSet.getName());
                 }
             }
         }
@@ -77,9 +89,9 @@ public class NanoGateRouteProperties {
             for (Route route : routes) {
                 if (!backendSetMap.containsKey(route.getBackendSet())) {
                     throw new IllegalStateException(
-                            String.format("Configuration validation error: Route with ID '%s' and path '%s' refers to a non-existent backend-set: '%s'",
-                                    route.getId(), route.getPath(), route.getBackendSet())
-                    );
+                            String.format(
+                                    "Configuration validation error: Route with ID '%s' and path '%s' refers to a non-existent backend-set: '%s'",
+                                    route.getId(), route.getPath(), route.getBackendSet()));
                 }
             }
         }
@@ -149,6 +161,19 @@ public class NanoGateRouteProperties {
 
     public void setBackendSets(List<BackendSet> backendSets) {
         this.backendSets = backendSets;
+    }
+
+    public GlobalSecuritySettings getSecurity() {
+        return security;
+    }
+
+    public void setSecurity(GlobalSecuritySettings security) {
+        this.security = security;
+    }
+
+    @Override
+    public GlobalSecuritySettings getSettings() {
+        return security;
     }
 
     /**

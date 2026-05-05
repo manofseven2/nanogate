@@ -28,6 +28,7 @@ public class YamlFilePollingProvider implements ConfigurationProvider {
 
     public YamlFilePollingProvider(@Value("${nanogate.routing.external-config-file:}") String configFilePath) {
         this.configFilePath = configFilePath;
+        log.info("Initialized YamlFilePollingProvider with path: '{}'", configFilePath);
         this.yamlMapper = new ObjectMapper(new YAMLFactory())
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
@@ -52,6 +53,7 @@ public class YamlFilePollingProvider implements ConfigurationProvider {
                 // For simplicity, we assume the YAML file directly maps to NanoGateRouteProperties
                 // i.e., it contains `routes:` and `backend-sets:` at the root level.
                 NanoGateRouteProperties newConfig = yamlMapper.readValue(file, NanoGateRouteProperties.class);
+                newConfig.initializeAndValidate();
                 cachedConfig = newConfig;
                 lastModifiedTime = currentModifiedTime;
                 return cachedConfig;

@@ -52,17 +52,10 @@ public class RequestOrchestrator {
     }
 
     public void orchestrate(HttpServletRequest request, HttpServletResponse response, Route route) throws IOException {
-        Long startTime = (Long) request.getAttribute(MetricAttribute.START_TIME_NANOS.name());
-        
         BackendSet backendSet = routeRegistry.get().getBackendSet(route.getBackendSet());
         if (backendSet == null) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Gateway configuration error.");
             return;
-        }
-
-        if (startTime != null) {
-            long overhead = System.nanoTime() - startTime;
-            request.setAttribute(MetricAttribute.OVERHEAD_DURATION_NANOS.name(), overhead);
         }
 
         proxyWithRetry(request, response, route, backendSet);

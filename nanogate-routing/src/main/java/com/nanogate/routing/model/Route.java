@@ -1,6 +1,7 @@
 package com.nanogate.routing.model;
 
 import com.nanogate.resilience.model.ResilienceProperties;
+import com.nanogate.security.model.SecurityProperties;
 
 /**
  * Represents a routing rule that maps a path to a named BackendSet.
@@ -23,6 +24,7 @@ public class Route {
     private RateLimitProperties rateLimit;
     private CorsProperties cors;
     private CacheProperties cache;
+    private SecurityProperties security;
 
     public String getId() {
         return id;
@@ -142,5 +144,13 @@ public class Route {
 
     public void setCache(CacheProperties cache) {
         this.cache = cache;
+    }
+
+    public SecurityProperties getSecurity() {
+        return security;
+    }
+
+    public void setSecurity(SecurityProperties security) {
+        this.security = security;
     }
 }

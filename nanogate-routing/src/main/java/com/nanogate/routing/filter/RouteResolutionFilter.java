@@ -3,11 +3,8 @@ package com.nanogate.routing.filter;
 import com.nanogate.routing.model.Route;
 import com.nanogate.routing.service.RouteLocator;
 import com.nanogate.security.SecurityConstants;
-import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -15,13 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Optional;
 
 @Component
-@Order(1) // Runs first among NanoGate core filters
-public class RouteResolutionFilter implements Filter {
+@Order(-200) // Run before Security to match the route only once
+public class RouteResolutionFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RouteResolutionFilter.class);
 
@@ -35,26 +33,26 @@ public class RouteResolutionFilter implements Filter {
     }
 
     @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws IOException, ServletException {
 
-        HttpServletRequest request = (HttpServletRequest) servletRequest;
-        HttpServletResponse response = (HttpServletResponse) servletResponse;
-
         if (request.getRequestURI().startsWith(actuatorBasePath)) {
-            filterChain.doFilter(servletRequest, servletResponse);
+            filterChain.doFilter(request, response);
             return;
         }
 
-        Optional<Route> optionalRoute = routeLocator.findRoute(request);
+        Optional<Route> matchedRoute = routeLocator.findRoute(request);
+        
+        // Store for downstream filters (Security, RateLimit, etc.) to avoid re-matching
+        matchedRoute.ifPresent(route -> request.setAttribute("nanogate.matched_route", route));
 
-        if (optionalRoute.isEmpty()) {
+        if (matchedRoute.isEmpty()) {
             log.warn("No route matched for request: {} {}", request.getMethod(), request.getRequestURI());
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
             return;
         }
 
-        Route route = optionalRoute.get();
+        Route route = matchedRoute.get();
         if (route.getIpSet() != null) {
             request.setAttribute(SecurityConstants.IP_SET_ATTRIBUTE, route.getIpSet());
         }
@@ -63,6 +61,6 @@ public class RouteResolutionFilter implements Filter {
         // we pass the necessary identifiers or we can just pass the whole route.
         request.setAttribute("NANO_ROUTE", route);
 
-        filterChain.doFilter(servletRequest, servletResponse);
+        filterChain.doFilter(request, response);
     }
 }

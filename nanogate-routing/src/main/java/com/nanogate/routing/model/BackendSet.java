@@ -1,6 +1,7 @@
 package com.nanogate.routing.model;
 
 import com.nanogate.resilience.model.ResilienceProperties;
+import com.nanogate.security.model.SecurityProperties;
 
 import java.net.URI;
 import java.util.List;
@@ -18,6 +19,7 @@ public class BackendSet {
     private ResilienceProperties resilience;
     private RateLimitProperties rateLimit;
     private CorsProperties cors;
+    private SecurityProperties security;
 
     public String getName() {
         return name;
@@ -81,5 +83,13 @@ public class BackendSet {
 
     public void setCors(CorsProperties cors) {
         this.cors = cors;
+    }
+
+    public SecurityProperties getSecurity() {
+        return security;
+    }
+
+    public void setSecurity(SecurityProperties security) {
+        this.security = security;
     }
 }

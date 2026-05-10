@@ -1,0 +1,4 @@
+nanogate:
+  routing:
+    # Set the path to the external configuration file
+    external-config-file: src/test/resources/external-routes.yml

@@ -36,3 +36,6 @@ out/
 ### VS Code ###
 .vscode/
 /*/target/**
+
+### ai ###
+.ai-context.md

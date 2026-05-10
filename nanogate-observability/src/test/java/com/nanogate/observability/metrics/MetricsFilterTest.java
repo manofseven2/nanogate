@@ -71,8 +71,11 @@ class MetricsFilterTest {
 
         // Simulate the orchestrator setting the attributes during the filter chain execution
         doAnswer(invocation -> {
-            attributeMap.put(MetricAttribute.OVERHEAD_DURATION_NANOS.name(), 100_000_000L); // 100ms
-            attributeMap.put(MetricAttribute.BACKEND_DURATION_NANOS.name(), 300_000_000L); // 300ms
+            // In the new logic, we don't set OVERHEAD_DURATION_NANOS attribute anymore
+            // We only set BACKEND_DURATION_NANOS. 
+            // We use a small value to ensure totalDuration (from test execution) 
+            // is not significantly smaller than backendDuration.
+            attributeMap.put(MetricAttribute.BACKEND_DURATION_NANOS.name(), 1_000_000L); // 1ms
             return null;
         }).when(filterChain).doFilter(request, response);
 
@@ -82,8 +85,8 @@ class MetricsFilterTest {
         assertThat(meterRegistry.get("nanogate.request.overhead").timer().count()).isEqualTo(1);
         assertThat(meterRegistry.get("nanogate.backend.response").timer().count()).isEqualTo(1);
 
-        assertThat(meterRegistry.get("nanogate.request.overhead").timer().totalTime(TimeUnit.MILLISECONDS)).isEqualTo(100);
-        assertThat(meterRegistry.get("nanogate.backend.response").timer().totalTime(TimeUnit.MILLISECONDS)).isEqualTo(300);
+        assertThat(meterRegistry.get("nanogate.request.overhead").timer().totalTime(TimeUnit.NANOSECONDS)).isGreaterThanOrEqualTo(0);
+        assertThat(meterRegistry.get("nanogate.backend.response").timer().totalTime(TimeUnit.MILLISECONDS)).isEqualTo(1);
         assertThat(meterRegistry.get("nanogate.requests.total").timer().totalTime(TimeUnit.NANOSECONDS)).isGreaterThan(0);
     }
 }

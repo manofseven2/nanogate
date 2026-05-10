@@ -1,0 +1,11 @@
+nanogate:
+  routing:
+    enabled: true
+    routes:
+      - id: native-route
+        path: /native/**
+        backend-set: backend-1
+    backend-sets:
+      - name: backend-1
+        servers:
+          - http://localhost:9090

@@ -1,8 +1,8 @@
 package com.nanogate.routing.filter;
 
 import com.nanogate.routing.model.Route;
-import com.nanogate.routing.service.RequestOrchestrator;
 import com.nanogate.routing.service.RouteLocator;
+import com.nanogate.security.SecurityConstants;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,7 +42,7 @@ class RouteResolutionFilterTest {
     void doFilter_ActuatorPath_ShouldDelegateToFilterChain() throws Exception {
         when(request.getRequestURI()).thenReturn("/actuator/health");
 
-        routeResolutionFilter.doFilter(request, response, filterChain);
+        routeResolutionFilter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
         verifyNoInteractions(routeLocator);
@@ -53,7 +53,7 @@ class RouteResolutionFilterTest {
         when(request.getRequestURI()).thenReturn("/api/unknown");
         when(routeLocator.findRoute(request)).thenReturn(Optional.empty());
         
-        routeResolutionFilter.doFilter(request, response, filterChain);
+        routeResolutionFilter.doFilterInternal(request, response, filterChain);
         
         verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
         verify(filterChain, never()).doFilter(request, response);
@@ -62,14 +62,14 @@ class RouteResolutionFilterTest {
     @Test
     void doFilter_RouteMatched_ShouldSetAttributesAndProceed() throws Exception {
         Route route = new Route();
-        route.setIpSet("test-ip-set");
+        route.setIpSet("admin-ips");
         when(request.getRequestURI()).thenReturn("/api/known");
         when(routeLocator.findRoute(request)).thenReturn(Optional.of(route));
 
-        routeResolutionFilter.doFilter(request, response, filterChain);
+        routeResolutionFilter.doFilterInternal(request, response, filterChain);
 
-        verify(request).setAttribute(com.nanogate.security.SecurityConstants.IP_SET_ATTRIBUTE, "test-ip-set");
-        verify(request).setAttribute("NANO_ROUTE", route);
+        verify(request).setAttribute(SecurityConstants.IP_SET_ATTRIBUTE, "admin-ips");
+        verify(request).setAttribute("nanogate.matched_route", route);
         verify(filterChain).doFilter(request, response);
         verify(response, never()).sendError(anyInt(), anyString());
     }

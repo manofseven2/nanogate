@@ -40,6 +40,12 @@
             <artifactId>resilience4j-ratelimiter</artifactId>
         </dependency>
 
+        <!-- Redis for Distributed Rate Limiting -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

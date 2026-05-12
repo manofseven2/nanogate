@@ -4,6 +4,7 @@ import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @EnableScheduling
+@ConditionalOnProperty(name = "nanogate.resilience.rate-limiter.type", havingValue = "in-memory", matchIfMissing = true)
 public class InMemoryRateLimiterService implements RateLimiterService {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryRateLimiterService.class);

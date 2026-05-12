@@ -28,7 +28,7 @@
 *   **Definition:**
     1. Add `spring-boot-starter-data-redis` to `nanogate-resilience`.
     2. Implement a new `RedisRateLimiterService` implementing the existing `RateLimiterService` interface.
-    3. Write a Lua script or utilize Redisson to perform atomic `check-and-decrement` operations for distributed rate limiting buckets.
+    3. Write a Lua script implementing the **Token Bucket** algorithm to perform atomic `check-and-decrement` operations for distributed rate limiting buckets (chosen for high accuracy, low memory usage, and burst support).
     4. Add configuration toggles to switch between `IN_MEMORY` and `REDIS` rate limiter implementations based on the environment profile.
 *   **Use Case:** A public API is restricted to 100 requests per minute per IP. With 5 NanoGate instances running in Kubernetes, a user makes 100 requests spread across all instances. The Redis backend tracks the global count, successfully blocking the 101st request regardless of which node receives it.
 

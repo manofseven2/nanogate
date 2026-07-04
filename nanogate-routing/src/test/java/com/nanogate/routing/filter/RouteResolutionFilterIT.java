@@ -114,6 +114,9 @@ class RouteResolutionFilterIT {
                 .withHeader("X-Gateway-Source", equalTo("NanoGate"))
                 .willReturn(aResponse().withStatus(200).withHeader("X-Powered-By", "Some-Framework").withBody("{\"headers\":\"ok\"}")));
 
+        // Force health check to circumvent race conditions with background polling during test execution
+        healthCheckService.checkServerHealth(new URI("http://localhost:" + backend1.port()), new HealthCheckProperties("/health", null, null)).join();
+
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(getBaseUrl() + "/api/headers/test")).header("X-Internal-Debug", "some-value").GET().build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 

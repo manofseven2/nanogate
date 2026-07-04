@@ -15,9 +15,11 @@ public class RouteRegistry {
     private static final Logger log = LoggerFactory.getLogger(RouteRegistry.class);
     
     private final AtomicReference<NanoGateRouteProperties> currentConfig = new AtomicReference<>();
+    private final com.nanogate.routing.service.discovery.ServiceDiscoveryRegistry serviceDiscoveryRegistry;
 
-    public RouteRegistry(NanoGateRouteProperties initialConfig) {
+    public RouteRegistry(NanoGateRouteProperties initialConfig, com.nanogate.routing.service.discovery.ServiceDiscoveryRegistry serviceDiscoveryRegistry) {
         this.currentConfig.set(initialConfig);
+        this.serviceDiscoveryRegistry = serviceDiscoveryRegistry;
         log.info("RouteRegistry initialized with {} backend-sets and {} routes", 
                 initialConfig.getBackendSets().size(), 
                 initialConfig.getRoutes().size());
@@ -36,6 +38,7 @@ public class RouteRegistry {
      */
     public void update(NanoGateRouteProperties newConfig) {
         currentConfig.set(newConfig);
+        serviceDiscoveryRegistry.invalidateCache();
         log.info("RouteRegistry hot-swapped configuration. New sizes: {} backend-sets, {} routes",
                 newConfig.getBackendSets().size(),
                 newConfig.getRoutes().size());

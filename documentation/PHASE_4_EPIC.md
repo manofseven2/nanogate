@@ -33,12 +33,13 @@
 *   **Use Case:** A public API is restricted to 100 requests per minute per IP. With 5 NanoGate instances running in Kubernetes, a user makes 100 requests spread across all instances. The Redis backend tracks the global count, successfully blocking the 101st request regardless of which node receives it.
 
 ## Task 4: Pluggable Service Discovery Integration
-*   **Goal:** Allow NanoGate to dynamically discover backend service IP addresses and ports using external service registries, rather than relying on hardcoded static lists.
+*   **Goal:** Allow NanoGate to dynamically discover backend service IP addresses and ports using various external registries and mechanisms, ensuring compatibility with all Kubernetes scenarios and famous registries (Consul, Eureka).
 *   **Definition:**
-    1. Create a `ServiceDiscoveryProvider` interface in `nanogate-routing`.
-    2. Implement support for DNS-based discovery or an integration with a popular registry (e.g., Consul or Eureka) via `spring-cloud-starter-consul-discovery`.
-    3. Modify the `RouteResolutionFilter` to resolve dynamic target URLs by querying the `ServiceDiscoveryProvider` when a backend set is marked as `dynamic`.
-*   **Use Case:** A new instance of `payment-service` starts up and registers with Consul. NanoGate automatically discovers this new instance and begins load balancing traffic to it without any manual configuration changes.
+    1. Create a `ServiceDiscoveryProvider` strategy interface in `nanogate-routing` to abstract different resolution mechanisms.
+    2. Implement a `SpringCloudDiscoveryProvider` that leverages Spring Cloud's `DiscoveryClient` to transparently support Consul, Eureka, Zookeeper, and the Kubernetes API via drop-in starter dependencies.
+    3. Implement a `DnsServiceDiscoveryProvider` to natively query A/SRV records, guaranteeing support for Kubernetes Headless Services and generic DNS-based client-side load balancing.
+    4. Integrate the active `ServiceDiscoveryProvider` into the `RoundRobinLoadBalancer` with a caching layer (e.g., Caffeine) to prevent registry/DNS polling on every request.
+*   **Use Case:** NanoGate is deployed in a hybrid environment. It discovers a legacy `payment-service` via Consul, a newer `auth-service` via the Kubernetes API, and a `cache-cluster` via Kubernetes Headless Service DNS. NanoGate handles all routing and client-side load balancing uniformly.
 
 ## Task 5: Phase 4 Integration & Chaos Testing
 *   **Goal:** Validate that configuration hot-reloading, security validations, and Redis connections function securely under load and failure conditions.

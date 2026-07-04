@@ -13,6 +13,8 @@ import java.util.List;
 public class BackendSet {
     private String name;
     private String loadBalancer = "ROUND_ROBIN"; // Default value
+    private DiscoveryType discoveryType = DiscoveryType.STATIC;
+    private String serviceId;
     private List<URI> servers;
     private HttpClientProperties httpClient;
     private HealthCheckProperties healthCheck;
@@ -35,6 +37,22 @@ public class BackendSet {
 
     public void setLoadBalancer(String loadBalancer) {
         this.loadBalancer = loadBalancer;
+    }
+
+    public DiscoveryType getDiscoveryType() {
+        return discoveryType;
+    }
+
+    public void setDiscoveryType(DiscoveryType discoveryType) {
+        this.discoveryType = discoveryType;
+    }
+
+    public String getServiceId() {
+        return serviceId;
+    }
+
+    public void setServiceId(String serviceId) {
+        this.serviceId = serviceId;
     }
 
     public List<URI> getServers() {

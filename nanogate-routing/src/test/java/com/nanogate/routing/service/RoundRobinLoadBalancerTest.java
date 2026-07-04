@@ -25,6 +25,9 @@ class RoundRobinLoadBalancerTest {
     @Mock
     private HealthCheckService healthCheckService;
 
+    @Mock
+    private com.nanogate.routing.service.discovery.ServiceDiscoveryRegistry serviceDiscoveryRegistry;
+
     @InjectMocks
     private RoundRobinLoadBalancer loadBalancer;
 
@@ -33,6 +36,11 @@ class RoundRobinLoadBalancerTest {
         // By default, assume all servers are healthy for existing tests.
         // This is marked as lenient because not all tests will use this stub (e.g., tests with empty server lists).
         lenient().when(healthCheckService.isHealthy(any(URI.class))).thenReturn(true);
+        
+        lenient().when(serviceDiscoveryRegistry.resolve(any(BackendSet.class))).thenAnswer(invocation -> {
+            BackendSet backendSet = invocation.getArgument(0);
+            return backendSet.getServers();
+        });
     }
 
     @Test

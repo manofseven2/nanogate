@@ -24,14 +24,16 @@ public class RoundRobinLoadBalancer implements LoadBalancer {
 
     private final ConcurrentHashMap<String, AtomicInteger> backendSetCounters = new ConcurrentHashMap<>();
     private final HealthCheckService healthCheckService;
+    private final com.nanogate.routing.service.discovery.ServiceDiscoveryRegistry serviceDiscoveryRegistry;
 
-    public RoundRobinLoadBalancer(HealthCheckService healthCheckService) {
+    public RoundRobinLoadBalancer(HealthCheckService healthCheckService, com.nanogate.routing.service.discovery.ServiceDiscoveryRegistry serviceDiscoveryRegistry) {
         this.healthCheckService = healthCheckService;
+        this.serviceDiscoveryRegistry = serviceDiscoveryRegistry;
     }
 
     @Override
     public Optional<URI> chooseBackend(BackendSet backendSet) {
-        List<URI> servers = backendSet.getServers();
+        List<URI> servers = serviceDiscoveryRegistry.resolve(backendSet);
         if (servers == null || servers.isEmpty()) {
             return Optional.empty();
         }

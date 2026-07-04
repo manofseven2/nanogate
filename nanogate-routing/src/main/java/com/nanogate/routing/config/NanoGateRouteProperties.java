@@ -43,6 +43,7 @@ public class NanoGateRouteProperties implements GlobalSecurityProvider {
     private List<Route> routes = new ArrayList<>();
     private List<BackendSet> backendSets = new ArrayList<>();
     private GlobalSecuritySettings security = new GlobalSecuritySettings();
+    private com.nanogate.routing.model.DiscoveryProperties discovery = new com.nanogate.routing.model.DiscoveryProperties();
 
     // Remove the inner class since it is now moved to GlobalSecuritySettings in
     // security module
@@ -169,6 +170,14 @@ public class NanoGateRouteProperties implements GlobalSecurityProvider {
 
     public void setSecurity(GlobalSecuritySettings security) {
         this.security = security;
+    }
+
+    public com.nanogate.routing.model.DiscoveryProperties getDiscovery() {
+        return discovery;
+    }
+
+    public void setDiscovery(com.nanogate.routing.model.DiscoveryProperties discovery) {
+        this.discovery = discovery;
     }
 
     @Override

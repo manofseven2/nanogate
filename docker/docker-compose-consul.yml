@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  consul:
+    image: hashicorp/consul:latest
+    container_name: nanogate-consul
+    ports:
+      - "8500:8500"
+    command: "agent -dev -client 0.0.0.0"
+
+  user-service-1:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-1
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose
+
+  user-service-2:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-2
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose
+
+  user-service-3-unhealthy:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-user-service-3-unhealthy
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./wiremock/mappings-unhealthy:/home/wiremock/mappings
+    command: --verbose
+
+  order-service:
+    image: wiremock/wiremock:latest
+    container_name: nanogate-mock-order-service
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+    command: --verbose
+
+  consul-registrator:
+    image: alpine/curl
+    container_name: nanogate-consul-registrator
+    depends_on:
+      - consul
+      - user-service-1
+      - user-service-2
+      - user-service-3-unhealthy
+      - order-service
+    command: >
+      /bin/sh -c "
+        sleep 5;
+        curl -X PUT -d '{\"ID\": \"user-service-1\", \"Name\": \"mock-user-service\", \"Address\": \"127.0.0.1\", \"Port\": 8081}' http://consul:8500/v1/agent/service/register;
+        curl -X PUT -d '{\"ID\": \"user-service-2\", \"Name\": \"mock-user-service\", \"Address\": \"127.0.0.1\", \"Port\": 8082}' http://consul:8500/v1/agent/service/register;
+        curl -X PUT -d '{\"ID\": \"user-service-3\", \"Name\": \"mock-user-service\", \"Address\": \"127.0.0.1\", \"Port\": 8083}' http://consul:8500/v1/agent/service/register;
+        curl -X PUT -d '{\"ID\": \"order-service-1\", \"Name\": \"mock-order-service\", \"Address\": \"127.0.0.1\", \"Port\": 9090}' http://consul:8500/v1/agent/service/register;
+        echo 'Registered all services in Consul';
+      "

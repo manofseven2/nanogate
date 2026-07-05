@@ -1,5 +1,7 @@
 package com.nanogate.routing.filter;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.routing.model.Route;
 import com.nanogate.routing.service.RouteLocator;
 import com.nanogate.security.SecurityConstants;
@@ -47,7 +49,10 @@ public class RouteResolutionFilter extends OncePerRequestFilter {
         matchedRoute.ifPresent(route -> request.setAttribute("nanogate.matched_route", route));
 
         if (matchedRoute.isEmpty()) {
-            log.warn("No route matched for request: {} {}", request.getMethod(), request.getRequestURI());
+            log.warn("No route matched for request: {} {}", request.getMethod(), request.getRequestURI(),
+                    StructuredArguments.kv("method", request.getMethod()),
+                    StructuredArguments.kv("uri", request.getRequestURI()),
+                    StructuredArguments.kv("error_type", "RouteNotFound"));
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
             return;
         }

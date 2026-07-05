@@ -1,5 +1,7 @@
 package com.nanogate.routing.service;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.resilience.model.ResilienceProperties;
 import com.nanogate.routing.config.RouteRegistry;
 import com.nanogate.routing.metrics.MetricAttribute;
@@ -96,15 +98,21 @@ public class RequestOrchestrator {
         } catch (CompletionException | UncheckedIOException e) {
             Throwable rootCause = findRootCause(e);
             if (rootCause instanceof CallNotPermittedException) {
-                log.warn("Circuit for {} is open. Retrying on a different backend.", targetUri);
+                log.warn("Circuit for {} is open. Retrying on a different backend.", targetUri,
+                        StructuredArguments.kv("targetUri", targetUri),
+                        StructuredArguments.kv("routeId", route.getId()),
+                        StructuredArguments.kv("error_type", "CircuitBreakerOpen"));
                 healthCheckService.markAsUnhealthy(targetUri);
                 proxyWithRetry(request, response, route, backendSet);
             } else if (rootCause instanceof IOException) {
-                log.warn("Request to {} failed with IO exception. Retrying on a different backend.", targetUri, rootCause);
+                log.warn("Request to {} failed with IO exception. Retrying on a different backend.", targetUri, rootCause,
+                        StructuredArguments.kv("targetUri", targetUri),
+                        StructuredArguments.kv("routeId", route.getId()),
+                        StructuredArguments.kv("error_type", "IOException"));
                 healthCheckService.markAsUnhealthy(targetUri);
                 proxyWithRetry(request, response, route, backendSet);
             } else {
-                handleUnexpectedException(response, targetUri, e);
+                handleUnexpectedException(response, targetUri, e, route);
             }
         } finally {
             connectionTracker.decrement(targetUri);
@@ -154,8 +162,11 @@ public class RequestOrchestrator {
         }
     }
 
-    private void handleUnexpectedException(HttpServletResponse response, URI targetUri, Exception e) throws IOException {
-        log.error("An unexpected, non-retryable error occurred during proxying to {}", targetUri, e);
+    private void handleUnexpectedException(HttpServletResponse response, URI targetUri, Exception e, Route route) throws IOException {
+        log.error("An unexpected, non-retryable error occurred during proxying to {}", targetUri, e,
+                StructuredArguments.kv("targetUri", targetUri),
+                StructuredArguments.kv("routeId", route != null ? route.getId() : "unknown"),
+                StructuredArguments.kv("error_type", "UnexpectedException"));
         if (!response.isCommitted()) {
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected gateway error occurred.");
         }

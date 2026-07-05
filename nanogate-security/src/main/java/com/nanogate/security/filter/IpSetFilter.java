@@ -1,5 +1,7 @@
 package com.nanogate.security.filter;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.security.SecurityConstants;
 import com.nanogate.security.service.IpSecurityService;
 import jakarta.servlet.Filter;
@@ -47,7 +49,10 @@ public class IpSetFilter implements Filter {
             }
 
             if (!ipSecurityService.isAllowed(ipSetName, clientIp)) {
-                log.warn("Access denied for IP {} matching IpSet '{}'", clientIp, ipSetName);
+                log.warn("Access denied for IP {} matching IpSet '{}'", clientIp, ipSetName,
+                        StructuredArguments.kv("client_ip", clientIp),
+                        StructuredArguments.kv("ipSetName", ipSetName),
+                        StructuredArguments.kv("error_type", "IpAccessDenied"));
                 HttpServletResponse response = (HttpServletResponse) servletResponse;
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied by IP Policy");
                 return; // Halt the chain

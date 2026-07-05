@@ -1,5 +1,7 @@
 package com.nanogate.resilience.service;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -64,12 +66,10 @@ public class RedisRateLimiterService implements RateLimiterService {
             log.info("RedisRateLimiterService acquirePermission result for {}: {}", key, result);
             return result != null && result == 1L;
         } catch (Exception e) {
-            // In a production scenario, you might want to fail-open (allow request) 
-            // or fail-closed based on configuration if Redis goes down.
-            // We log the error and allow the request (fail-open) to prevent a Redis outage 
-            // from taking down the entire API Gateway.
-            log.warn("Redis rate limiter failed for key: {}. Allowing request. Error: {}", key, e.getMessage());
-            e.printStackTrace();
+            log.warn("Redis rate limiter failed for key: {}. Allowing request. Error: {}", key, e.getMessage(),
+                    StructuredArguments.kv("rateLimitKey", key),
+                    StructuredArguments.kv("error_type", "RedisError"));
+            // Fail open: allow traffic if Redis goes down
             return true;
         }
     }

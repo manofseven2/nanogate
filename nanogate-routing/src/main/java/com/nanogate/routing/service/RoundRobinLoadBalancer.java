@@ -1,5 +1,7 @@
 package com.nanogate.routing.service;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.routing.model.BackendSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +46,9 @@ public class RoundRobinLoadBalancer implements LoadBalancer {
                 .collect(Collectors.toList());
 
         if (healthyServers.isEmpty()) {
-            log.warn("No healthy servers available for backend set: {}", backendSet.getName());
+            log.warn("No healthy servers available for backend set: {}", backendSet.getName(),
+                    StructuredArguments.kv("backendSet", backendSet.getName()),
+                    StructuredArguments.kv("error_type", "NoHealthyBackend"));
             return Optional.empty();
         }
 

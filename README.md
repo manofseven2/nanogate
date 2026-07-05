@@ -71,6 +71,8 @@ Implements response caching to reduce latency and backend load. It uses Spring's
 Provides deep visibility into the gateway's behavior and performance. It integrates with:
 *   **Spring Boot Actuator:** For health checks and basic metrics.
 *   **Micrometer and OpenTelemetry:** For exposing detailed metrics and distributed traces, allowing integration with monitoring systems like Prometheus and Jaeger.
+*   **Structured Logging:** Outputs pure JSON logs via Logstash encoder (for all profiles except `local`). To test the structured logs locally, start the application with `-Dspring.profiles.active=prod` and issue a request; you'll immediately see the `AccessLoggingFilter` outputting structured JSON containing the duration, method, and trace context to the console!
+
 ## Configuration & Hot-Reloading
 NanoGate supports zero-downtime configuration updates by polling an external URL or file. 
 

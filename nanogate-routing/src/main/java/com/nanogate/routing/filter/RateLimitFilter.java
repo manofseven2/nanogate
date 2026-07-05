@@ -1,5 +1,7 @@
 package com.nanogate.routing.filter;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.resilience.service.RateLimiterService;
 import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.config.RouteRegistry;
@@ -70,7 +72,10 @@ public class RateLimitFilter implements Filter {
         boolean allowed = rateLimiterService.acquirePermission(namespacedKey, rateLimit.getRequestsPerSecond());
 
         if (!allowed) {
-            log.warn("Rate limit exceeded for route '{}' with key '{}'", route.getId(), namespacedKey);
+            log.warn("Rate limit exceeded for route '{}' with key '{}'", route.getId(), namespacedKey,
+                    StructuredArguments.kv("routeId", route.getId()),
+                    StructuredArguments.kv("rateLimitKey", namespacedKey),
+                    StructuredArguments.kv("error_type", "RateLimitExceeded"));
             response.sendError(429, "Too Many Requests");
             return;
         }

@@ -1,5 +1,7 @@
 package com.nanogate.routing.config;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -59,7 +61,9 @@ public class YamlFilePollingProvider implements ConfigurationProvider {
                 lastModifiedTime = currentModifiedTime;
                 return cachedConfig;
             } catch (Exception e) {
-                log.error("Failed to parse external YAML configuration from {}", configFilePath, e);
+                log.error("Failed to parse external YAML configuration from {}", configFilePath, e,
+                        StructuredArguments.kv("configFilePath", configFilePath),
+                        StructuredArguments.kv("error_type", "ConfigPollingError"));
                 // Return cached config if parsing fails, so we don't break the gateway
                 return cachedConfig;
             }

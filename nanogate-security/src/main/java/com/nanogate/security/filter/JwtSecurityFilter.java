@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 /**
  * Filter that enforces the resolved security policy for a route.
  */
@@ -53,14 +55,19 @@ public class JwtSecurityFilter extends OncePerRequestFilter {
 
         // If enabled and no route found, we block (as requested)
         if (policy.matchedRouteId() == null) {
-            log.warn("Security is enabled but no route matched for URI {}. Blocking request.", request.getRequestURI());
+            log.warn("Security is enabled but no route matched for URI {}. Blocking request.", request.getRequestURI(),
+                    StructuredArguments.kv("uri", request.getRequestURI()),
+                    StructuredArguments.kv("error_type", "NoRouteMatchedForSecuredUri"));
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "No matching route found for secured gateway");
             return;
         }
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.warn("Missing or invalid Authorization header for secured route {}", policy.matchedRouteId());
+            log.warn("Missing or invalid Authorization header for secured route {}", policy.matchedRouteId(),
+                    StructuredArguments.kv("routeId", policy.matchedRouteId()),
+                    StructuredArguments.kv("uri", request.getRequestURI()),
+                    StructuredArguments.kv("error_type", "MissingAuthHeader"));
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bearer token required");
             return;
         }
@@ -77,7 +84,11 @@ public class JwtSecurityFilter extends OncePerRequestFilter {
             // Validate Scopes & Roles
             if (!authorize(jwt, policy)) {
                 log.warn("Insufficient permissions for route {}. Required Scopes: {}, Roles: {}", 
-                    policy.matchedRouteId(), policy.requiredScopes(), policy.requiredRoles());
+                    policy.matchedRouteId(), policy.requiredScopes(), policy.requiredRoles(),
+                    StructuredArguments.kv("routeId", policy.matchedRouteId()),
+                    StructuredArguments.kv("required_scopes", policy.requiredScopes()),
+                    StructuredArguments.kv("required_roles", policy.requiredRoles()),
+                    StructuredArguments.kv("error_type", "InsufficientPermissions"));
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
                 return;
             }
@@ -91,8 +102,13 @@ public class JwtSecurityFilter extends OncePerRequestFilter {
 
             filterChain.doFilter(request, response);
 
+        } catch (org.springframework.security.oauth2.jwt.JwtException e) {
+            log.warn("JWT validation failed: {}", e.getMessage(),
+                    StructuredArguments.kv("error_type", "JwtValidationFailed"));
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token: " + e.getMessage());
         } catch (Exception e) {
-            log.warn("JWT validation failed: {}", e.getMessage());
+            log.warn("General security error: {}", e.getMessage(),
+                    StructuredArguments.kv("error_type", "GeneralSecurityError"));
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token: " + e.getMessage());
         }
     }

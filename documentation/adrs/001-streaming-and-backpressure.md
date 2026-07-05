@@ -12,7 +12,7 @@ To solve this, frameworks like Spring WebFlux introduced complex Reactive Progra
 
 We will **not** use complex reactive programming or buffer entire responses in memory.
 
-Instead, NanoGate relies on the synergy between **Java 21 Virtual Threads**, **Blocking I/O**, and **Chunked Streaming (`InputStream.transferTo()`)**. We use `HttpResponse.BodyHandlers.ofInputStream()` to read from the backend connection.
+Instead, NanoGate relies on the synergy between **Java 25 Virtual Threads**, **Blocking I/O**, and **Chunked Streaming (`InputStream.transferTo()`)**. We use `HttpResponse.BodyHandlers.ofInputStream()` to read from the backend connection.
 
 ## Reasoning (The Mechanics)
 

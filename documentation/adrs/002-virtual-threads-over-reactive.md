@@ -4,7 +4,7 @@
 
 When building an API Gateway, high concurrency is the primary technical requirement. A gateway might need to handle 10,000 concurrent requests, proxying them to various downstream microservices. 
 
-Historically, in the Java ecosystem (pre-Java 21), achieving this level of concurrency required adopting the Reactive Programming paradigm (e.g., Spring WebFlux, Project Reactor, Netty). This was because traditional OS threads are heavy (~1MB each); spinning up 10,000 OS threads would immediately cause an `OutOfMemoryError` or severe context-switching overhead.
+Historically, in the Java ecosystem (pre-Java 25), achieving this level of concurrency required adopting the Reactive Programming paradigm (e.g., Spring WebFlux, Project Reactor, Netty). This was because traditional OS threads are heavy (~1MB each); spinning up 10,000 OS threads would immediately cause an `OutOfMemoryError` or severe context-switching overhead.
 
 However, Reactive Programming comes with significant drawbacks:
 *   **Steep Learning Curve:** The `Mono`/`Flux` mental model is notoriously difficult to learn and master.
@@ -15,11 +15,11 @@ However, Reactive Programming comes with significant drawbacks:
 
 We will **not** use Spring WebFlux or the Reactive stack for NanoGate. 
 
-Instead, NanoGate uses **Spring Web MVC** combined with **Java 21 Virtual Threads**.
+Instead, NanoGate uses **Spring Web MVC** combined with **Java 25 Virtual Threads**.
 
 ## Reasoning
 
-Java 21 introduced Virtual Threads (Project Loom). Virtual threads are lightweight threads managed by the JVM, not the OS. They consume merely a few hundred bytes of RAM each. The JVM can easily run millions of virtual threads concurrently on a standard machine.
+Java 25 introduced Virtual Threads (Project Loom). Virtual threads are lightweight threads managed by the JVM, not the OS. They consume merely a few hundred bytes of RAM each. The JVM can easily run millions of virtual threads concurrently on a standard machine.
 
 When a virtual thread executes a blocking I/O operation (like `HttpClient.send()` or `OutputStream.write()`), the JVM seamlessly unmounts it from the underlying physical carrier thread. The physical thread immediately picks up another virtual thread. When the network operation finishes, the virtual thread is remounted and continues.
 

@@ -39,7 +39,7 @@
 *   **Goal:** Finalize ARM/Bicep templates for deployment to Azure Virtual Machine Scale Sets (VMSS).
 *   **Definition:**
     1. Write a Bicep template `nanogate-vmss.bicep` that provisions a Virtual Machine Scale Set.
-    2. Write cloud-init scripts to install Java 21 and run the NanoGate JAR as a systemd service.
+    2. Write cloud-init scripts to install Java 25 and run the NanoGate JAR as a systemd service.
     3. Configure an Azure Load Balancer to route traffic to the VMSS instances.
     4. Set up auto-scaling rules based on CPU percentage in the Bicep template.
 *   **Use Case:** A customer who prefers IaaS over Kubernetes triggers a GitHub Action that uses the Bicep template to automatically build a scalable VM cluster in Azure, install the Java runtime, and configure the NanoGate application to start on boot behind an Azure Load Balancer.

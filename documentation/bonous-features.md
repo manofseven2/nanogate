@@ -9,7 +9,7 @@ This document captures advanced architectural concepts, patterns, and potential 
 ### Context & Feasibility
 Traffic mirroring allows the duplication of live production traffic to a staging or "v2" service without impacting the actual user's response or experience. This is a highly advanced, enterprise-grade pattern used for testing new deployments under real load before directing actual user traffic to them.
 
-Implementing this in NanoGate is highly feasible and elegant due to our technology stack (Java 21 + Virtual Threads).
+Implementing this in NanoGate is highly feasible and elegant due to our technology stack (Java 25 + Virtual Threads).
 
 ### The Mechanism
 When a `Route` is configured with a `mirror-backend-set`:

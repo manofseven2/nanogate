@@ -1,6 +1,6 @@
 # NanoGate - A Lightweight, Cloud-Native API Gateway
 
-**NanoGate** is a lightweight, performant, and highly scalable API Gateway designed for modern cloud-native architectures. Built with Java 21+ and Spring Boot 4, it serves as a powerful reverse proxy to manage, secure, and observe API traffic for downstream microservices.
+**NanoGate** is a lightweight, performant, and highly scalable API Gateway designed for modern cloud-native architectures. Built with Java 25+ and Spring Boot 4, it serves as a powerful reverse proxy to manage, secure, and observe API traffic for downstream microservices.
 
 The primary goal of NanoGate is to provide a streamlined and efficient alternative to complex, enterprise-grade API gateways, focusing on low overhead, elastic scalability, and deep observability. It is designed from the ground up to be deployed on cloud platforms like Microsoft Azure and optimized for modern deployment practices, including containerization and native compilation with GraalVM.
 
@@ -17,9 +17,9 @@ The primary goal of NanoGate is to provide a streamlined and efficient alternati
 
 ## Technology Stack
 
-- **Java 21+:** Leverages the latest features of the Java platform.
+- **Java 25+:** Leverages the latest features of the Java platform.
 - **Spring Boot 4.x:** Provides a robust, auto-configured foundation.
-- **Virtual Threads:** Uses Java 21's virtual threads for highly concurrent, non-blocking I/O, maximizing throughput with a simple, synchronous coding model.
+- **Virtual Threads:** Uses Java 25's virtual threads for highly concurrent, non-blocking I/O, maximizing throughput with a simple, synchronous coding model.
 - **Maven:** For dependency management and build automation.
 - **Docker:** For containerization and consistent deployments.
 - **JUnit 5 & Mockito:** For comprehensive unit, mock, and integration testing.

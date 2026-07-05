@@ -1,5 +1,7 @@
 package com.nanogate.security.filter;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -36,7 +38,10 @@ public class RequestSizeLimitFilter implements Filter {
         long contentLength = request.getContentLengthLong();
 
         if (contentLength > maxRequestBodySize) {
-            log.warn("Request rejected: body size ({}) exceeds the configured limit of {} bytes.", contentLength, maxRequestBodySize);
+            log.warn("Request rejected: body size ({}) exceeds the configured limit of {} bytes.", contentLength, maxRequestBodySize,
+                    StructuredArguments.kv("contentLength", contentLength),
+                    StructuredArguments.kv("maxRequestBodySize", maxRequestBodySize),
+                    StructuredArguments.kv("error_type", "PayloadTooLarge"));
             ((HttpServletResponse) servletResponse).sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Request body exceeds limit");
             return;
         }

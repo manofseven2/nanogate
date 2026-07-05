@@ -1,5 +1,7 @@
 package com.nanogate.routing.service;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.nanogate.routing.config.ConfigurationRefreshedEvent;
 import com.nanogate.routing.config.NanoGateRouteProperties;
 import com.nanogate.routing.config.RouteRegistry;
@@ -13,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -90,20 +93,26 @@ public class ActiveHealthCheckService implements HealthCheckService {
 
             return healthCheckClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                     .thenAccept(response -> {
-                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        if (response.statusCode() >= 200 && response.statusCode() < 400) {
                             markAsHealthy(serverUri);
                         } else {
+                            log.warn("Health check failed for {}: Status {}", serverUri, response.statusCode(),
+                                    StructuredArguments.kv("backendUri", serverUri),
+                                    StructuredArguments.kv("statusCode", response.statusCode()),
+                                    StructuredArguments.kv("error_type", "HealthCheckFailed"));
                             markAsUnhealthy(serverUri);
-                            log.warn("Health check failed for {}: Status {}", serverUri, response.statusCode());
                         }
                     }).exceptionally(throwable -> {
+                        log.warn("Health check failed for {}: {}", serverUri, throwable.getMessage(),
+                                StructuredArguments.kv("backendUri", serverUri),
+                                StructuredArguments.kv("error_type", "HealthCheckFailed"));
                         markAsUnhealthy(serverUri);
-                        log.warn("Health check failed for {}: {}", serverUri, throwable.getMessage());
                         return null; // Handle exception and complete normally
                     });
-        } catch (Exception e) {
-            markAsUnhealthy(serverUri);
-            log.error("Error creating health check URI for {}", serverUri, e);
+        } catch (URISyntaxException e) {
+            log.error("Error creating health check URI for {}", serverUri, e,
+                    StructuredArguments.kv("backendUri", serverUri),
+                    StructuredArguments.kv("error_type", "InvalidHealthCheckUri"));
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -125,7 +134,9 @@ public class ActiveHealthCheckService implements HealthCheckService {
     public void markAsUnhealthy(URI serverUri) {
         AtomicBoolean previousStatus = healthStatusMap.computeIfAbsent(serverUri, k -> new AtomicBoolean(true));
         if (previousStatus.getAndSet(false)) {
-            log.warn("Backend server {} is now marked as DOWN", serverUri);
+            log.warn("Backend server {} is now marked as DOWN", serverUri,
+                    StructuredArguments.kv("backendUri", serverUri),
+                    StructuredArguments.kv("event", "BackendMarkedDown"));
         }
     }
 

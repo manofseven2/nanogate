@@ -1,5 +1,7 @@
 package com.nanogate.routing.config;
 
+import net.logstash.logback.argument.StructuredArguments;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -66,12 +68,17 @@ public class HttpPollingProvider implements ConfigurationProvider {
                 }
                 return cachedConfig;
             } else {
-                log.warn("Failed to fetch HTTP configuration. Status code: {}", response.statusCode());
+                log.warn("Failed to fetch HTTP configuration. Status code: {}", response.statusCode(),
+                        StructuredArguments.kv("configUrl", configUrl),
+                        StructuredArguments.kv("statusCode", response.statusCode()),
+                        StructuredArguments.kv("error_type", "ConfigPollingError"));
+                return cachedConfig;
             }
         } catch (Exception e) {
-            log.error("Error fetching HTTP configuration from {}", configUrl, e);
+            log.error("Error fetching HTTP configuration from {}", configUrl, e,
+                    StructuredArguments.kv("configUrl", configUrl),
+                    StructuredArguments.kv("error_type", "ConfigPollingError"));
+            return cachedConfig;
         }
-        
-        return cachedConfig;
     }
 }

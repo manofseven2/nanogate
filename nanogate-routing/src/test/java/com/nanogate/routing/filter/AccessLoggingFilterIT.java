@@ -70,11 +70,11 @@ class AccessLoggingFilterIT {
 
     @Test
     void testAccessLoggingDoesNotDisruptRouting() throws Exception {
-        backend1.stubFor(get(urlEqualTo("/api/ratelimit/test"))
+        backend1.stubFor(get(urlEqualTo("/api/exact"))
                 .willReturn(aResponse().withStatus(200).withBody("ok")));
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(getBaseUrl() + "/api/ratelimit/test"))
+                .uri(URI.create(getBaseUrl() + "/api/exact"))
                 .header("X-Forwarded-For", "192.168.1.50")
                 .GET()
                 .build();

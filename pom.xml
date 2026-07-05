@@ -14,13 +14,16 @@
 
     <groupId>com.nanogate</groupId>
     <artifactId>nanogate-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>NanoGate Parent</name>
     <description>Parent POM for the NanoGate API Gateway Project</description>
 
     <properties>
+        <!-- CI/CD Friendly Versioning -->
+        <revision>1.0.0-SNAPSHOT</revision>
+        
         <java.version>25</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>

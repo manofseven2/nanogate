@@ -39,9 +39,6 @@ jobs:
       - name: Make mvnw executable
         run: chmod +x mvnw
 
-      - name: Build with Maven (Skip Tests)
-        run: ./mvnw clean package -DskipTests
-
       - name: Calculate Next Version and Create Tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
@@ -50,6 +47,9 @@ jobs:
           default_bump: ${{ github.event.inputs.release_type }}
           release_branches: main
           create_annotated_tag: true
+
+      - name: Build with Maven (Skip Tests)
+        run: ./mvnw clean package -DskipTests -Drevision=${{ steps.tag_version.outputs.new_version }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

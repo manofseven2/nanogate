@@ -15,6 +15,11 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.nanogate.security.service.RouteSecurityResolver;
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
+import java.util.Collections;
 
 import java.io.IOException;
 import java.net.URI;
@@ -39,11 +44,15 @@ class IpSetFilterIT {
     @LocalServerPort
     private int port;
 
+    @MockitoBean
+    private RouteSecurityResolver routeSecurityResolver;
+
     private final HttpClient httpClient = HttpClient.newBuilder().build();
 
     @Configuration
     static class TestConfig {
         @Bean
+
         public FilterRegistrationBean<Filter> mockRouteFilter() {
             FilterRegistrationBean<Filter> registrationBean = new FilterRegistrationBean<>();
             registrationBean.setFilter(new Filter() {
@@ -65,6 +74,17 @@ class IpSetFilterIT {
 
     private String getBaseUrl() {
         return "http://localhost:" + port;
+    }
+
+    @BeforeEach
+    void setUpMock() {
+        Mockito.when(routeSecurityResolver.resolvePolicy(Mockito.any()))
+               .thenReturn(new RouteSecurityResolver.ResolvedSecurityPolicy(
+                       false, 
+                       Collections.emptyList(), 
+                       Collections.emptyList(), 
+                       Collections.emptyMap(), 
+                       null));
     }
 
     @Test

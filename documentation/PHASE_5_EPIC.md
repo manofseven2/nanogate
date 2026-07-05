@@ -22,7 +22,7 @@
     1. Create a GitHub Actions workflow (`.github/workflows/ci.yml`) that triggers on pull requests to run the Maven build, unit tests, and integration tests.
     2. Create a Dockerfile optimized for Spring Boot / Java 25, leveraging layered JARs and a minimal base image (e.g., Eclipse Temurin JRE or Alpine).
     3. Create a GitHub Actions workflow (`.github/workflows/publish.yml`) that builds the Docker image and pushes it to a container registry (e.g., GitHub Packages, Azure Container Registry) upon merging to `main`.
-    4. Implement semantic versioning (SemVer) and automated Git tagging for releases.
+    4. Implement semantic versioning (SemVer) and automated Git tagging for releases. we should have a release step manually we push it to make a new release and push and the release notes should be populated using commit history. We have to define in advance what type of release we want to make (patch, minor, major). 
 *   **Use Case:** A developer submits a pull request. The CI pipeline automatically spins up, runs all Unit and Integration tests, and reports success. Once merged, the CD pipeline builds a hardened Docker image and pushes it to the registry, ready for deployment to AKS or VMSS.
 
 ## Task 3: Infrastructure as Code (IaC) for Kubernetes

@@ -71,3 +71,9 @@ Implements response caching to reduce latency and backend load. It uses Spring's
 Provides deep visibility into the gateway's behavior and performance. It integrates with:
 *   **Spring Boot Actuator:** For health checks and basic metrics.
 *   **Micrometer and OpenTelemetry:** For exposing detailed metrics and distributed traces, allowing integration with monitoring systems like Prometheus and Jaeger.
+## Configuration & Hot-Reloading
+NanoGate supports zero-downtime configuration updates by polling an external URL or file. 
+
+**Spring Cloud Config Server Integration:**
+If you are using Spring Cloud Config Server and want to dynamically load configuration using the HTTP Poller (
+anogate.routing.external-config-url), you **must** point it to the Config Server's plain text YAML endpoint (e.g., http://config-server:8888/nanogate-default.yml). Do not point it to the default JSON endpoint, as the HTTP poller relies on parsing the raw YAML properties directly.

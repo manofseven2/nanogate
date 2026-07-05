@@ -50,7 +50,8 @@ public class YamlFilePollingProvider implements ConfigurationProvider {
             log.info("Detected changes in external configuration file: {}", configFilePath);
             try {
                 // To support the structure 'nanogate: routing: routes: ...' we could wrap it
-                // For simplicity, we assume the YAML file directly maps to NanoGateRouteProperties
+                // For simplicity, we assume the YAML file directly maps to
+                // NanoGateRouteProperties
                 // i.e., it contains `routes:` and `backend-sets:` at the root level.
                 NanoGateRouteProperties newConfig = yamlMapper.readValue(file, NanoGateRouteProperties.class);
                 newConfig.initializeAndValidate();
@@ -60,7 +61,7 @@ public class YamlFilePollingProvider implements ConfigurationProvider {
             } catch (Exception e) {
                 log.error("Failed to parse external YAML configuration from {}", configFilePath, e);
                 // Return cached config if parsing fails, so we don't break the gateway
-                return cachedConfig; 
+                return cachedConfig;
             }
         }
         return cachedConfig;

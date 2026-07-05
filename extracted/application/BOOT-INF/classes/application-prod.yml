@@ -1,0 +1,18 @@
+# Production Profile Configuration
+
+# This profile ensures that logging is not too verbose in a production environment.
+logging:
+  level:
+    com.nanogate: INFO # Ensure INFO level logging for production
+
+# In a real production scenario, you would override backend server URLs here:
+# nanogate:
+#   routing:
+#     backend-sets:
+#       - name: user-service-backend
+#         servers:
+#           - http://prod-user-service-1.internal
+#           - http://prod-user-service-2.internal
+#       - name: order-service-backend
+#         servers:
+#           - http://prod-order-service.internal

@@ -8,7 +8,7 @@ ARG JAR_FILE=nanogate-app/target/nanogate-app-*.jar
 COPY ${JAR_FILE} application.jar
 
 # Extract the Spring Boot layered JAR using the tools mode
-RUN java -Djarmode=tools -jar application.jar extract --destination extracted
+RUN java -Djarmode=tools -jar application.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
 FROM eclipse-temurin:25-jre-alpine

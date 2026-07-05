@@ -1,0 +1,73 @@
+# Security-enabled Development Configuration
+# Use this profile (dev-security) for comprehensive security testing.
+# This file includes full route and backend definitions with security policies applied.
+
+nanogate:
+  routing:
+    # Global Security Settings (Baseline for all routes)
+    security:
+      enabled: true
+      issuerUri: "http://localhost:9080/realms/nanogate"
+      jwksUri: "http://localhost:9080/realms/nanogate/protocol/openid-connect/certs"
+      audiences:
+        - "nanogate-gateway"
+        - "user-service"
+      forwardClaims:
+        user_id: "X-User-Id"
+        email: "X-User-Email"
+
+    backend-sets:
+      - name: user-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - http://localhost:8081
+          - http://localhost:8082
+        health-check:
+          path: /health
+        # Backend-level security: requires profile and email scopes for any route using this backend
+        security:
+          requiredScopes:
+            - "profile"
+            - "email"
+
+      - name: order-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - http://localhost:9090
+
+    routes:
+      - id: rewrite-route
+        path: /api/users/**
+        backend-set: user-service-backend
+        stripPrefix: 1
+        rewritePath: "/users/(?<id>.*)"
+        rewriteReplacement: "/user/fetch?id=${id}"
+        # Route-level override: explicitly disable security for this public rewrite endpoint
+        security:
+          enabled: false
+
+      - id: order-service-route
+        path: /api/orders/**
+        backend-set: order-service-backend
+        # Route-level security: requires ORDER_READER role
+        security:
+          requiredRoles:
+            - "ORDER_READER"
+          forwardClaims:
+            preferred_username: "X-Order-By"
+
+      - id: internal-admin-route
+        path: /api/admin/**
+        backend-set: user-service-backend
+        ip-set: internal-only
+        # Route-level security: requires ADMIN role and admin:write scope
+        security:
+          requiredRoles:
+            - "ADMIN"
+          requiredScopes:
+            - "admin:write"
+
+      - id: public-user-route
+        path: /api/public/**
+        backend-set: user-service-backend
+        # No route-level override; inherits Global + BackendSet security

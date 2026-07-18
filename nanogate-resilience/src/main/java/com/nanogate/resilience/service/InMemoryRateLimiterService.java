@@ -2,6 +2,9 @@ package com.nanogate.resilience.service;
 
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.micrometer.tagged.TaggedRateLimiterMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +28,13 @@ public class InMemoryRateLimiterService implements RateLimiterService {
     private static final long EXPIRATION_MILLIS = 3600000;
 
     private final Map<String, RateLimiterEntry> rateLimiters = new ConcurrentHashMap<>();
+    private final RateLimiterRegistry registry = RateLimiterRegistry.ofDefaults();
+
+    public InMemoryRateLimiterService(MeterRegistry meterRegistry) {
+        TaggedRateLimiterMetrics
+            .ofRateLimiterRegistry(registry)
+            .bindTo(meterRegistry);
+    }
 
     @Override
     public boolean acquirePermission(String key, int requestsPerSecond) {
@@ -39,7 +49,7 @@ public class InMemoryRateLimiterService implements RateLimiterService {
                 .limitForPeriod(requestsPerSecond)
                 .timeoutDuration(Duration.ZERO) // Fail immediately if no permission is available
                 .build();
-        return RateLimiter.of(name, config);
+        return registry.rateLimiter(name, config);
     }
 
     /**
@@ -55,6 +65,7 @@ public class InMemoryRateLimiterService implements RateLimiterService {
         while (iterator.hasNext()) {
             Map.Entry<String, RateLimiterEntry> entry = iterator.next();
             if (now - entry.getValue().lastAccessTime > EXPIRATION_MILLIS) {
+                registry.remove(entry.getKey());
                 iterator.remove();
             }
         }

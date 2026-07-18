@@ -39,3 +39,8 @@ out/
 
 ### ai ###
 .ai-context.md
+
+### Docker Observability Data ###
+docker/logs/
+docker/elasticsearch-data/
+docker/grafana-data/

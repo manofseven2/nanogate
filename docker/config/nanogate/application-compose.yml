@@ -1,0 +1,137 @@
+# Docker Profile Configuration
+
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+# Enable more verbose logging for easier debugging
+logging:
+  level:
+    com.nanogate: DEBUG
+  config: /config/logback-spring.xml
+
+nanogate:
+  security:
+    ip-sets:
+      - name: internal-only
+        type: ALLOW
+        ips:
+          - "127.0.0.1"
+          - "10.0.0.0/8"
+          - "192.168.0.0/16"
+          - "172.16.0.0/12" # Docker networks
+      - name: block-bad-actors
+        type: BLOCK
+        ips:
+          - "203.0.113.50"
+          - "198.51.100.0/24"
+  routing:
+    backend-sets:
+      - name: user-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          # In Docker, we refer to other services by their container name
+          - http://user-service-1:8080
+          - http://user-service-2:8080
+          - http://user-service-3-unhealthy:8080
+        http-client:
+          connectTimeout: 8s
+        health-check:
+          path: /health
+          interval: 10s
+          timeout: 2s
+        resilience:
+          failureRateThreshold: 50.0
+          slidingWindowSize: 10
+          minimumNumberOfCalls: 5
+          waitDurationInOpenState: 10s
+        rate-limit:
+          requestsPerSecond: 10
+          resolver: "IP"
+
+      - name: order-service-backend
+        load-balancer: ROUND_ROBIN
+        servers:
+          - http://order-service:8080
+
+    routes:
+      - id: user-report-route
+        path: /api/users/reports/**
+        backend-set: user-service-backend
+        http-client:
+          responseTimeout: 60s
+
+      - id: rewrite-route
+        path: /api/users/**
+        backend-set: user-service-backend
+        stripPrefix: 1
+        rewritePath: "/users/(?<id>.*)"
+        rewriteReplacement: "/user/fetch?id=${id}"
+        requestHeaders:
+          add:
+            X-Downstream-Trace-Id: "nanogate-{header.X-Request-Id}"
+
+      - id: order-service-route
+        path: /api/orders/**
+        backend-set: order-service-backend
+        
+      - id: header-transform-route
+        path: /api/headers/**
+        backend-set: user-service-backend
+        requestHeaders:
+          add:
+            X-Gateway-Source: "NanoGate"
+          remove:
+            - "X-Internal-Debug"
+        responseHeaders:
+          add:
+            X-Content-Source: "Backend"
+          remove:
+            - "X-Powered-By"
+
+      - id: internal-admin-route
+        path: /api/admin/**
+        backend-set: user-service-backend
+        ip-set: internal-only
+      
+      - id: public-user-route
+        path: /api/public/**
+        backend-set: user-service-backend
+        ip-set: block-bad-actors
+        rate-limit:
+          requestsPerSecond: 2
+          resolver: "HEADER"
+          resolverArg: "X-API-Key"
+        cors:
+          enabled: true
+          allowedOrigins:
+            - "*" # Allowing all for local docker testing
+          allowedMethods:
+            - "GET"
+            - "POST"
+            - "OPTIONS"
+          allowCredentials: true
+        cache:
+          enabled: true
+          ttl: 60s
+          vary-by-headers:
+            - "Accept-Language"
+
+# Actuator Configuration for Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus"
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name:nanogate}

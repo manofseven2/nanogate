@@ -1,0 +1,22 @@
+filebeat.inputs:
+- type: filestream
+  id: nanogate-logs
+  enabled: true
+  paths:
+    - /var/log/nanogate/*.json
+  parsers:
+    - ndjson:
+        target: "" # merge JSON fields to the root
+        overwrite_keys: true
+        add_error_key: true
+        expand_keys: true
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  # If we need indices separated by day:
+  index: "filebeat-%{[agent.version]}-%{+yyyy.MM.dd}"
+
+setup.template.name: "filebeat"
+setup.template.pattern: "filebeat-*"
+setup.kibana:
+  host: "http://kibana:5601"

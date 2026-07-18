@@ -40,6 +40,18 @@
             <artifactId>resilience4j-ratelimiter</artifactId>
         </dependency>
 
+        <!-- Micrometer core for metrics registry -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <!-- Resilience4j Micrometer integration -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
         <!-- Redis for Distributed Rate Limiting -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

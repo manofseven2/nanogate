@@ -1,0 +1,178 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Gateway Request Rate (per second)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(nanogate_requests_total_seconds_count[1m])) by (path, status)",
+          "legendFormat": "{{path}} - {{status}}"
+        }
+      ]
+    },
+    {
+      "title": "Gateway Latency vs Backend Response",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(nanogate_requests_total_seconds_sum[1m])) by (path) / sum(rate(nanogate_requests_total_seconds_count[1m])) by (path)",
+          "legendFormat": "Total Latency: {{path}}"
+        },
+        {
+          "expr": "sum(rate(nanogate_backend_response_seconds_sum[1m])) by (path) / sum(rate(nanogate_backend_response_seconds_count[1m])) by (path)",
+          "legendFormat": "Backend Response: {{path}}"
+        }
+      ]
+    },
+    {
+      "title": "Backend Service Instances Health",
+      "type": "state-timeline",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "nanogate_backend_health",
+          "legendFormat": "{{backend_set}} -> {{server}}"
+        }
+      ],
+      "options": {
+        "mergeValues": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red" },
+                "1": { "text": "UP", "color": "green" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Gateway Routing Overhead",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nanogate_request_overhead_seconds_sum[1m])) by (path) / sum(rate(nanogate_request_overhead_seconds_count[1m])) by (path)",
+          "legendFormat": "Overhead: {{path}}"
+        }
+      ]
+    },
+    {
+      "title": "Circuit Breaker States",
+      "type": "state-timeline",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_state",
+          "legendFormat": "{{name}} - {{state}}"
+        }
+      ],
+      "options": {
+        "mergeValues": true
+      }
+    },
+    {
+      "title": "Rate Limiter Rejections (per second)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(resilience4j_ratelimiter_calls_total{kind=\"not_permitted\"}[1m])) by (name)",
+          "legendFormat": "Rejections: {{name}}"
+        }
+      ]
+    },
+    {
+      "title": "JVM Memory Usage",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+          "legendFormat": "Heap Used"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{area=\"heap\"}",
+          "legendFormat": "Heap Max"
+        }
+      ]
+    },
+    {
+      "title": "Active JVM Threads",
+      "type": "gauge",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "Live Threads"
+        }
+      ]
+    },
+    {
+      "title": "System CPU Usage",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "process_cpu_usage",
+          "legendFormat": "Process CPU"
+        },
+        {
+          "expr": "system_cpu_usage",
+          "legendFormat": "System CPU"
+        }
+      ]
+    },
+    {
+      "title": "Log Events Rate (per second)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum(rate(logback_events_total[1m])) by (level)",
+          "legendFormat": "{{level}} Logs"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "NanoGate Metrics",
+  "uid": "nanogate-metrics-dash",
+  "version": 2
+}

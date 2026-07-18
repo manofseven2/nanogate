@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -49,7 +50,7 @@ class ActiveHealthCheckServiceTest {
         routeRegistry = mock(RouteRegistry.class);
         properties = mock(NanoGateRouteProperties.class);
         org.mockito.Mockito.lenient().when(routeRegistry.get()).thenReturn(properties);
-        healthCheckService = new ActiveHealthCheckService(routeRegistry, healthCheckClient);
+        healthCheckService = new ActiveHealthCheckService(routeRegistry, healthCheckClient, new SimpleMeterRegistry());
     }
 
     @Test

@@ -1,6 +1,9 @@
 package com.nanogate.routing.service;
 
 import net.logstash.logback.argument.StructuredArguments;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import jakarta.annotation.PostConstruct;
 
 import com.nanogate.routing.config.ConfigurationRefreshedEvent;
 import com.nanogate.routing.config.NanoGateRouteProperties;
@@ -36,14 +39,42 @@ public class ActiveHealthCheckService implements HealthCheckService {
     private final ConcurrentHashMap<URI, AtomicBoolean> healthStatusMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastCheckTimeMap = new ConcurrentHashMap<>();
     private final HttpClient healthCheckClient;
+    private final MeterRegistry meterRegistry;
 
     // This CompletableFuture will be completed when all checks in the last runHealthChecks cycle are done.
     private volatile CompletableFuture<Void> lastRunCompletion = CompletableFuture.completedFuture(null);
 
     public ActiveHealthCheckService(RouteRegistry routeRegistry,
-                                    @Qualifier("healthCheckHttpClient") HttpClient healthCheckClient) {
+                                    @Qualifier("healthCheckHttpClient") HttpClient healthCheckClient,
+                                    MeterRegistry meterRegistry) {
         this.routeRegistry = routeRegistry;
         this.healthCheckClient = healthCheckClient;
+        this.meterRegistry = meterRegistry;
+    }
+
+    @PostConstruct
+    public void initGauges() {
+        NanoGateRouteProperties properties = routeRegistry.get();
+        if (properties != null && properties.getBackendSets() != null) {
+            for (BackendSet backendSet : properties.getBackendSets()) {
+                if (backendSet.getServers() != null) {
+                    for (URI serverUri : backendSet.getServers()) {
+                        registerGauge(backendSet.getName(), serverUri);
+                    }
+                }
+            }
+        }
+    }
+
+    private void registerGauge(String backendSetName, URI serverUri) {
+        meterRegistry.gauge("nanogate.backend.health",
+            List.of(
+                Tag.of("backend_set", backendSetName),
+                Tag.of("server", serverUri.toString())
+            ),
+            serverUri,
+            uri -> isHealthy(uri) ? 1.0 : 0.0
+        );
     }
 
     @Scheduled(fixedDelayString = "${nanogate.routing.health-check.ticker-interval:1000}") // Fast, global ticker
@@ -149,5 +180,6 @@ public class ActiveHealthCheckService implements HealthCheckService {
         log.info("Configuration refreshed. Clearing old health check state.");
         healthStatusMap.clear();
         lastCheckTimeMap.clear();
+        initGauges();
     }
 }

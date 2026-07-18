@@ -46,6 +46,7 @@
         <module>nanogate-protocol-support</module>
         <module>nanogate-caching</module>
         <module>nanogate-observability</module>
+        <module>nanogate-load-tests</module>
     </modules>
 
     <!-- Dependency Management for all child modules -->

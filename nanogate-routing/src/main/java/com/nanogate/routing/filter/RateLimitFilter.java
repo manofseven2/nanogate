@@ -17,6 +17,7 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -33,13 +34,16 @@ public class RateLimitFilter implements Filter {
     private final RateLimiterService rateLimiterService;
     private final RateLimitKeyResolverFactory keyResolverFactory;
     private final RouteRegistry routeRegistry;
+    private final MeterRegistry meterRegistry;
 
     public RateLimitFilter(RateLimiterService rateLimiterService,
                            RateLimitKeyResolverFactory keyResolverFactory,
-                           RouteRegistry routeRegistry) {
+                           RouteRegistry routeRegistry,
+                           MeterRegistry meterRegistry) {
         this.rateLimiterService = rateLimiterService;
         this.keyResolverFactory = keyResolverFactory;
         this.routeRegistry = routeRegistry;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -76,9 +80,16 @@ public class RateLimitFilter implements Filter {
                     StructuredArguments.kv("routeId", route.getId()),
                     StructuredArguments.kv("rateLimitKey", namespacedKey),
                     StructuredArguments.kv("error_type", "RateLimitExceeded"));
+            
+            // Record rate limit rejection metric
+            meterRegistry.counter("resilience4j.ratelimiter.calls", "name", namespacedKey, "kind", "not_permitted").increment();
+            
             response.sendError(429, "Too Many Requests");
             return;
         }
+
+        // Record successful rate limiter call
+        meterRegistry.counter("resilience4j.ratelimiter.calls", "name", namespacedKey, "kind", "successful").increment();
 
         filterChain.doFilter(servletRequest, servletResponse);
     }

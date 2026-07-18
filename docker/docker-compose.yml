@@ -1,15 +1,38 @@
-# This Docker Compose file sets up a mock environment for local development.
-# It uses WireMock to simulate the backend services defined in application-dev.yml.
-#
-# To run:
-# 1. Navigate to this 'docker' directory.
-# 2. Run 'docker-compose up -d'
-#
-# The mock services will be available on their respective ports (8081, 8082, 8083, 9090).
-# You can then run the NanoGate application locally, and it will route requests
-# to these mock services.
+version: '3.8'
 
 services:
+  # The NanoGate API Gateway
+  nanogate:
+    image: nanogate:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: nanogate
+    ports:
+      - "8080:8080"
+    environment:
+      # Use the sample-mock profile to activate the application-sample-mock.yml routing configs
+      - SPRING_PROFILES_ACTIVE=sample-mock
+      # Use an external configuration file for defining routes, backends, and logging
+      - SPRING_CONFIG_ADDITIONAL_LOCATION=file:/config/application-sample-mock.yml
+    volumes:
+      - ./config/nanogate/application-sample-mock.yml:/config/application-sample-mock.yml:ro
+      - ./config/nanogate/logback-spring.xml:/config/logback-spring.xml:ro
+      - ./logs:/var/log/nanogate # Shared volume for logs
+    depends_on:
+      - user-service-1
+      - user-service-2
+      - user-service-3-unhealthy
+      - order-service
+      - redis
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  # --- Mock Backend Services (WireMock) ---
   user-service-1:
     image: wiremock/wiremock:latest
     container_name: nanogate-mock-user-service-1
@@ -45,3 +68,71 @@ services:
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings
     command: --verbose
+
+  # --- Metrics Stack ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    depends_on:
+      - nanogate
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  # --- Logging Stack (ELK) ---
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./elasticsearch-data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.1
+    container_name: filebeat
+    user: root
+    # Disable strict config file permissions checks which fail on Windows mounts
+    command: [ "filebeat", "-e", "-strict.perms=false" ]
+    volumes:
+      - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/nanogate:ro # Read from the shared log volume
+    depends_on:
+      - elasticsearch
+      - nanogate

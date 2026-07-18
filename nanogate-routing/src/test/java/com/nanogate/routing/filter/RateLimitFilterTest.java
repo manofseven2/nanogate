@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class RateLimitFilterTest {
 
@@ -34,7 +35,7 @@ class RateLimitFilterTest {
         routeRegistry = mock(RouteRegistry.class);
         routeProperties = mock(NanoGateRouteProperties.class);
         org.mockito.Mockito.lenient().when(routeRegistry.get()).thenReturn(routeProperties);
-        filter = new RateLimitFilter(rateLimiterService, keyResolverFactory, routeRegistry);
+        filter = new RateLimitFilter(rateLimiterService, keyResolverFactory, routeRegistry, new SimpleMeterRegistry());
 
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);

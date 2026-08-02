@@ -16,6 +16,7 @@ WORKDIR /app
 
 # Create a non-root user for enhanced security
 RUN addgroup -S nanogate && adduser -S nanogate -G nanogate
+RUN mkdir -p /var/log/nanogate && chown -R nanogate:nanogate /var/log/nanogate
 USER nanogate:nanogate
 
 # Copy the extracted layers in order of change frequency

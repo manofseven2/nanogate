@@ -44,3 +44,4 @@ out/
 docker/logs/
 docker/elasticsearch-data/
 docker/grafana-data/
+logs/

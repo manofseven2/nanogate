@@ -1,0 +1,16 @@
+services:
+  nanogate:
+    image: nanogate:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nanogate
+    ports:
+      - "8080:8080"
+    environment:
+      # Production profile activates production routing and resilience configs
+      - SPRING_PROFILES_ACTIVE=production
+      # - SPRING_CONFIG_ADDITIONAL_LOCATION=file:/config/routes-config.yml
+    volumes:
+      - ./docker/config/nanogate/logback-spring.xml:/config/logback-spring.xml:ro
+      - ./logs:/var/log/nanogate

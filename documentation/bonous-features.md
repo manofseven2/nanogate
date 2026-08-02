@@ -104,6 +104,6 @@ Drawing inspiration from successful API gateways (like Kong, Traefik, and Kraken
 ### Key Strategic Features
 *   **"5-Minute Wow" Experience:** Ensure developers can run `docker run nanogate` locally and immediately see value through a built-in dashboard and auto-discovery, with zero mandatory configuration.
 *   **Visual Configurator:** Provide a web-based UI or a powerful CLI tool to easily generate the `application.yml` and routing rules, reducing the barrier to entry for new users.
-*   **1-Click Cloud Deployments:** Add official AWS CloudFormation and Azure ARM/Bicep templates to the repository, enabling 1-click deployments to serverless environments like AWS Fargate, AWS ECS, or Azure Container Apps.
+*   **Multi-Tier Deployment Options:** Provide deployment paths for all non-serverless architectures: a `docker-compose.yml` for budget VPS deployments, 1-Click AWS/Azure VM cluster templates (EC2/VMSS) for standard production, and Helm charts for enterprise Kubernetes (EKS/AKS)—all bundled with Prometheus/Grafana observability.
 *   **Cloud Marketplace Integrations:** Publish NanoGate as a pre-configured solution in the AWS and Azure Marketplaces for enterprise visibility and frictionless procurement.
 *   **Extensible Plugin Ecosystem:** Expose a robust plugin architecture (e.g., Lua, JavaScript, or Java-based) to encourage a community-driven ecosystem for custom rate-limiting, authentication, and logging extensions.

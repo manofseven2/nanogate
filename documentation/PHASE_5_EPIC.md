@@ -15,7 +15,6 @@
     4. Add a `logback-spring.xml` configuration to support dynamic log level adjustments at runtime without restarts.
 *   **Use Case:** A production issue occurs in the API gateway. The operations team can easily query Azure Log Analytics for all 500-level errors or filter by a specific Trace ID, because every log entry is reliably structured in a queryable JSON format.
 
-
 ## Task 2: CI/CD Pipelines & Containerization
 *   **Goal:** Automate the build, test, and containerization processes using GitHub Actions to continuously deliver production-ready artifacts.
 *   **Definition:**
@@ -25,49 +24,57 @@
     4. Implement semantic versioning (SemVer) and automated Git tagging for releases. we should have a release step manually we push it to make a new release and push and the release notes should be populated using commit history. We have to define in advance what type of release we want to make (patch, minor, major). 
 *   **Use Case:** A developer submits a pull request. The CI pipeline automatically spins up, runs all Unit and Integration tests, and reports success. Once merged, the CD pipeline builds a hardened Docker image and pushes it to the registry, ready for deployment to AKS or VMSS.
 
-## Task 3: Infrastructure as Code (IaC) for Kubernetes
-*   **Goal:** Finalize Helm charts for seamless deployment to Azure Kubernetes Service (AKS).
+## Task 3: Infrastructure as Code (IaC) - Docker Compose (The Budget / Hobbyist Path)
+*   **Goal:** Provide the absolute lowest-cost deployment option for single-node Virtual Private Servers (VPS) using Docker Compose, complete with the observability stack.
 *   **Definition:**
-    1. Create a `helm/nanogate` directory structure.
-    2. Create Kubernetes `Deployment`, `Service`, and `ConfigMap` templates.
-    3. Configure Horizontal Pod Autoscaler (HPA) templates based on CPU and memory utilization.
-    4. Support injecting secrets (e.g., keystores, external URL tokens) via the Azure Key Vault Secrets Provider class.
-    5. Test the Helm deployment locally using minikube or docker-desktop kubernetes.
-*   **Use Case:** A DevOps engineer uses `helm install nanogate ./helm/nanogate` in a CI/CD pipeline. The chart instantly spins up the gateway pods, configures auto-scaling policies, and mounts the external application secrets, completely automating the deployment process.
+    1. Create a production-ready `docker-compose.yml` in the root directory.
+    2. Configure the compose file to spin up NanoGate, Prometheus, and Grafana simultaneously.
+    3. Ensure data persistence for Prometheus metrics via local Docker volumes.
+*   **Use Case:** A solo developer or small startup wants to run NanoGate on a $5/month DigitalOcean Droplet or AWS Lightsail instance. They simply clone the repo and run `docker-compose up -d` to instantly get a working gateway with a Grafana dashboard.
 
-## Task 4: Infrastructure as Code (IaC) for Virtual Machines
-*   **Goal:** Finalize ARM/Bicep templates for deployment to Azure Virtual Machine Scale Sets (VMSS).
-*   **Definition:**
-    1. Write a Bicep template `nanogate-vmss.bicep` that provisions a Virtual Machine Scale Set.
-    2. Write cloud-init scripts to install Java 25 and run the NanoGate JAR as a systemd service.
-    3. Configure an Azure Load Balancer to route traffic to the VMSS instances.
-    4. Set up auto-scaling rules based on CPU percentage in the Bicep template.
-*   **Use Case:** A customer who prefers IaaS over Kubernetes triggers a GitHub Action that uses the Bicep template to automatically build a scalable VM cluster in Azure, install the Java runtime, and configure the NanoGate application to start on boot behind an Azure Load Balancer.
-
-## Task 5: Performance Benchmarking & Load Testing
-*   **Goal:** Conduct rigorous load testing to prove the "low overhead" and horizontal scaling requirements under massive traffic spikes.
+## Task 4: Performance Benchmarking & Load Testing
+*   **Goal:** Conduct rigorous load testing to prove the "low overhead" and horizontal scaling requirements under massive traffic spikes across the deployment environments.
 *   **Definition:**
     1. Write a Gatling or JMeter load testing script simulating concurrent high-throughput API traffic.
-    2. Deploy the gateway and a mock backend to a staging environment.
+    2. Deploy the gateway and a mock backend locally using Docker Compose (Task 3).
     3. Run the load test and measure P99 latency and overhead introduced by NanoGate (Target: < 5ms overhead).
     4. Profile the application under load using async-profiler or Java Flight Recorder to detect memory leaks and lock contentions.
-    5. Optimize garbage collection (ZGC/G1GC) and Virtual Thread configuration based on profiling data.
-*   **Use Case:** Before a Black Friday sale, the engineering team runs the load testing suite. The tests verify that the gateway can smoothly handle 10,000 requests per second with less than 5 milliseconds of added latency, validating production readiness.
+    5. Publish benchmarking results in the documentation to demonstrate performance parity.
+*   **Use Case:** Before adopting the project, a technical lead reviews the benchmark documentation. The tests verify that the gateway can smoothly handle 10,000 requests per second with less than 5 milliseconds of added latency.
 
-## Task 6: Operational Documentation & Runbooks
-*   **Goal:** Complete operational runbooks, architecture diagrams, and developer guides.
+## Task 5: Infrastructure as Code (IaC) - Virtual Machine Clusters (The Standard Production Path)
+*   **Goal:** Provide "1-Click" deployment templates for highly available, cost-effective Virtual Machine (IaaS) clusters on both AWS and Azure.
+*   **Definition:**
+    1. Write an **AWS CloudFormation** template (`aws-ec2-asg.yaml`) that deploys NanoGate to an EC2 Auto Scaling Group using cheap burstable instances (e.g., `t4g.small`).
+    2. Write an **Azure Bicep/ARM** template (`azure-vmss.bicep`) that deploys NanoGate to an Azure Virtual Machine Scale Set (VMSS) using `B-series` instances.
+    3. Ensure these templates provision a centralized Grafana/Prometheus instance within the same Virtual Network.
+    4. Provide "Launch Stack" (AWS) and "Deploy to Azure" buttons directly in the `README.md`.
+*   **Use Case:** A mid-sized team clicks "Deploy to AWS" in the README. The template provisions a robust, auto-scaling VM cluster for under $30/month, alongside a pre-configured Grafana dashboard for a consistent "single pane of glass" view.
+
+## Task 6: Infrastructure as Code (IaC) - Kubernetes & Helm (The Enterprise Path)
+*   **Goal:** Finalize standard Helm charts for seamless deployment to any Kubernetes cluster (AWS EKS, Azure AKS, on-prem) for enterprise users who already run K8s.
+*   **Definition:**
+    1. Create a `helm/nanogate` directory structure.
+    2. Create Kubernetes `Deployment`, `Service`, `ConfigMap`, and `HPA` templates.
+    3. Support standard Kubernetes Secrets for sensitive configuration.
+    4. Bundle a pre-configured `kube-prometheus-stack` dependency in the Helm chart to ensure dashboards and metrics deploy alongside the gateway.
+*   **Use Case:** A DevOps engineer uses `helm install nanogate ./helm/nanogate` in a CI/CD pipeline. The chart instantly spins up the gateway pods on their existing EKS cluster, configuring auto-scaling and integrating with their existing Prometheus setup.
+
+## Task 7: Operational Documentation & Runbooks
+*   **Goal:** Complete operational runbooks, architecture diagrams, and developer guides tailored for the multi-cloud, open-source community.
 *   **Definition:**
     1. Write a `TROUBLESHOOTING.md` runbook covering common production issues (e.g., backend timeouts, out of memory, config sync failures).
-    2. Write a `DEPLOYMENT_GUIDE.md` for both AKS and VMSS environments.
+    2. Write a `DEPLOYMENT_GUIDE.md` providing step-by-step instructions for Docker Compose, AWS (EC2/EKS), and Azure (VMSS/AKS).
     3. Finalize architecture diagrams using Mermaid JS in the main `ARCHITECTURE.md` file.
-    4. Clean up code comments and generate comprehensive JavaDoc for the core routing APIs.
-*   **Use Case:** A new Site Reliability Engineer is paged at 3:00 AM because of a failing route. They open the `TROUBLESHOOTING.md` runbook and immediately find step-by-step instructions on how to reload the hot-swappable routing configuration and inspect the circuit breaker metrics.
+    4. Clean up code comments and generate comprehensive JavaDoc.
+*   **Use Case:** An SRE is paged because of a failing route. They open the `TROUBLESHOOTING.md` runbook and immediately find step-by-step instructions on how to reload the hot-swappable routing configuration.
 
-## Task 7: Verification & Pre-Production Sign-off
-*   **Goal:** Final validation before moving to Azure Marketplace publication.
+## Task 8: Verification & Open-Source 1.0 Release
+*   **Goal:** Final validation before officially launching NanoGate 1.0 to the open-source community.
 *   **Definition:**
     1. Execute the full suite of integration tests in a CI pipeline.
-    2. Run SAST (Static Application Security Testing) tools on the codebase (e.g., SonarQube).
-    3. Ensure 0 critical or high vulnerabilities in third-party dependencies (Dependabot/OWASP Dependency-Check).
-    4. Final code review and merge to the main branch.
-*   **Use Case:** The release manager requires a final sign-off before tagging a 1.0.0 release. The automated CI pipelines ensure that test coverage is high, code quality is exceptional, and there are absolutely no known security vulnerabilities in the gateway.
+    2. Run SAST tools on the codebase (e.g., SonarQube).
+    3. Ensure 0 critical or high vulnerabilities in third-party dependencies.
+    4. Publish the official 1.0 Docker image to DockerHub and GitHub Container Registry.
+    5. Draft and publish the official GitHub Release notes.
+*   **Use Case:** The maintainer approves the final PR. The automated CD pipelines ensure the public Docker images are built and pushed, and the 1-click deploy templates are pointing to a stable 1.0 release.

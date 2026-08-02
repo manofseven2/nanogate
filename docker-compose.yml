@@ -14,3 +14,4 @@ services:
     volumes:
       - ./docker/config/nanogate/logback-spring.xml:/config/logback-spring.xml:ro
       - ./logs:/var/log/nanogate
+      # - ./routes-config.yml:/config/routes-config.yml:ro

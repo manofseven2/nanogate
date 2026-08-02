@@ -79,3 +79,13 @@ NanoGate supports zero-downtime configuration updates by polling an external URL
 **Spring Cloud Config Server Integration:**
 If you are using Spring Cloud Config Server and want to dynamically load configuration using the HTTP Poller (
 anogate.routing.external-config-url), you **must** point it to the Config Server's plain text YAML endpoint (e.g., http://config-server:8888/nanogate-default.yml). Do not point it to the default JSON endpoint, as the HTTP poller relies on parsing the raw YAML properties directly.
+
+## Deployment
+
+### Budget / Hobbyist Path (Docker Compose)
+For a lightweight, single-node deployment (e.g., a cheapest VPS like DigitalOcean Droplet or AWS Lightsail), NanoGate includes a production-ready `docker-compose.yml` in the root directory. This setup spins up the Gateway.
+
+1. Clone the repository to your server.
+2. *(On Linux, you may need to run `mkdir logs && chown -R 1000:1000 logs` before starting the containers to ensure the non-root container user can write to the volume).*
+3. Configure your routes and run `docker-compose up -d` in the root directory.
+4. Access NanoGate on port `8080`.
